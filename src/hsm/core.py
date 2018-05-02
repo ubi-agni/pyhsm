@@ -20,6 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.addHandler(logging.NullHandler())
 
 
+string_types = (str, unicode)
 any_event = object()
 
 
@@ -324,6 +325,20 @@ class StateMachine(State):
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.stack = Stack()
 
+    def __getitem__(self, key):
+        if isinstance(key, State):
+            return key
+
+        def findByName(name):
+            for state in self.states:
+                if state.name == name:
+                    return state
+            return None
+
+        keys = key.split('.', 1)
+        state = findByName(keys[0])
+        return state if len(keys) == 1 else state[keys[1]]
+
     def add_state(self, state, initial=False):
         '''Add a state to a state machine.
 
@@ -336,10 +351,13 @@ class StateMachine(State):
         :type initial: bool
 
         '''
+        if isinstance(state, string_types):
+            state = State(state)
         Validator(self).validate_add_state(state, initial)
         state.initial = initial
         state.parent = self
         self.states.add(state)
+        return state
 
     def add_states(self, *states):
         '''Add `states` to the |StateMachine|.
@@ -464,6 +482,9 @@ class StateMachine(State):
             after = self._nop
         if condition is None:
             condition = self._nop
+        # handle string names: retrieve State instances
+        from_state = self[from_state]
+        to_state = self[to_state]
 
         Validator(self).validate_add_transition(from_state, to_state, events, input)
 

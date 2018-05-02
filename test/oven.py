@@ -46,6 +46,13 @@ def rosSubscribe(state, topic, msg_type, handler):
 
 # It's possible to encapsulate all state related behaviour in a state class.
 class HeatingState(StateMachine):
+    def __init__(self, name):
+        super(HeatingState, self).__init__(name)
+        baking = State('Baking')
+        self.add_state(baking, initial=True)
+        toasting = State('Toasting')
+        self.add_state(toasting)
+
     def on_enter(self, event):
         oven = event.kwargs['source_event'].kwargs['oven']
         if not oven.timer.is_alive():
@@ -65,26 +72,20 @@ class Oven(object):
 
     def _get_state_machine(self):
         oven = StateMachine('Oven')
+
         door_closed = StateMachine('Door closed')
-        door_open = State('Door open')
-        heating = HeatingState('Heating')
-        toasting = State('Toasting')
-        baking = State('Baking')
-        off = State('Off')
-
         oven.add_state(door_closed, initial=True)
-        oven.add_state(door_open)
+        off = door_closed.add_state('Off', initial=True)
+        heating = door_closed.add_state(HeatingState('Heating'))
 
-        door_closed.add_state(off, initial=True)
-        door_closed.add_state(heating)
-        heating.add_state(baking, initial=True)
-        heating.add_state(toasting)
+        door_open = oven.add_state('Door open')
 
-        oven.add_transition(door_closed, toasting, events=['toast'])
-        oven.add_transition(door_closed, baking, events=['bake'])
+        oven.add_transition(door_closed, heating['Toasting'], events=['toast'])
+        oven.add_transition(door_closed, heating['Baking'], events=['bake'])
         oven.add_transition(door_closed, off, events=['off', 'timeout'])
         oven.add_transition(door_closed, door_open, events=['open'])
 
+        # define enter/exit/event handlers as arbitrary callbacks
         door_open.add_handler('enter', self.on_open_enter)
         door_open.add_handler('exit', self.on_open_exit)
         door_open.add_handler('close', self.on_door_close)
