@@ -12,6 +12,9 @@ This module provides the core elements for hierarchical state machines: Event, S
 .. |Iterable| replace:: :class:`~collections.Iterable`
 .. |Callable| replace:: :class:`~collections.Callable`
 """
+# for Python 2 / 3 code compatibility
+from __future__ import print_function
+from six import iteritems
 
 import collections
 from collections import deque
@@ -36,6 +39,7 @@ def listify(obj):
         return []
     return obj if isinstance(obj, (list, tuple)) else [obj]
 
+
 def _call(handler, *args, **kwargs):
     """Call handlers, handling a single function or a list of functions"""
     for cb in listify(handler):
@@ -43,12 +47,12 @@ def _call(handler, *args, **kwargs):
 
 
 class StateMachineException(Exception):
-    '''All |StateMachine| exceptions are of this type. '''
+    """All |StateMachine| exceptions are of this type."""
     pass
 
 
 class Event(object):
-    r'''Events trigger actions and transitions.
+    """Events trigger actions and transitions.
 
     An event has a name and can carry userdata.
     The following attributes are set after an event has been dispatched:
@@ -75,19 +79,19 @@ class Event(object):
 
         state_machine.dispatch(Event('start'))
         state_machine.dispatch(Event('start', key='value'))
-    '''
-    def __init__(self, name, **kwargs):
+    """
+    def __init__(self, name, **userdata):
         self.name = name
         self.propagate = True
-        self.kwargs = kwargs
+        self.userdata = userdata
         self._machine = None
 
     def __repr__(self):
-        return '<Event {0}, userdata={1}>'.format(self.name, self.kwargs)
+        return '<Event {0}, userdata={1}>'.format(self.name, self.userdata)
 
 
 class State(object):
-    '''Represents a state in a state machine.
+    """Represents a state in a state machine.
 
     `enter` and `exit` handlers are called whenever a state is entered or
     exited respectively. These action names are reserved only for this purpose.
@@ -120,14 +124,14 @@ class State(object):
         running = State('running')
         running.add_handler('event', my_handler)
 
-    '''
+    """
     def __init__(self, name):
         self.name = name
         self.parent = None
         self._handlers = {}
 
         # register handlers for methods with name "on_*"
-        for trigger, value in self.__class__.__dict__.iteritems():
+        for trigger, value in iteritems(self.__class__.__dict__):
             if trigger.startswith('on_') and callable(value):
                 self.add_handler(trigger[3:], value)
 
@@ -135,7 +139,7 @@ class State(object):
         """ Add a new event callback.
 
         :param trigger: name of triggering event
-        :type name: str
+        :type trigger: str
         :param func: callback function
         :type func: callable
         """
@@ -147,8 +151,19 @@ class State(object):
     def __repr__(self):
         return '<State {0} ({1})>'.format(self.name, hex(id(self)))
 
+    @property
+    def root(self):
+        """Get the root state in a states hierarchy.
+
+        :returns: Root state in the states hierarchy
+        :rtype: |State|
+        """
+        while self.parent is not None:
+            self = self.parent
+        return self
+
     def is_substate(self, state):
-        '''Check whether the `state` is a substate of `self`.
+        """Check whether the `state` is a substate of `self`.
 
         Also `self` is considered a substate of `self`.
 
@@ -156,8 +171,7 @@ class State(object):
         :type state: |State|
         :returns: `True` if `state` is a substate of `self`, `False` otherwise
         :rtype: bool
-
-        '''
+        """
         parent = self
         while parent:
             if parent is state:
@@ -280,8 +294,8 @@ class StateMachine(State):
         **leaf_state**
             See the :attr:`~.StateMachine.leaf_state` property.
 
-        **root_machine**
-            See the :attr:`~.StateMachine.root_machine` property.
+        **root**
+            See the :attr:`~.StateMachine.root` property.
 
     :param name: Human readable state machine name
     :type name: str
@@ -303,7 +317,7 @@ class StateMachine(State):
 
     .. code-block:: python
 
-        state_machine = StateMachine('root_machine')
+        state_machine = StateMachine('root')
         state_on = State('On')
         state_off = State('Off')
         state_machine.add_state('Off', initial=True)
@@ -312,8 +326,8 @@ class StateMachine(State):
         state_machine.add_transition(state_off, state_on, events=['on'])
         state_machine.initialize()
         state_machine.dispatch(Event('on'))
+    """
 
-    '''
     STACK_SIZE = 32
 
     def __init__(self, name):
@@ -394,19 +408,6 @@ class StateMachine(State):
             if state.initial:
                 return state
         return None
-
-    @property
-    def root_machine(self):
-        '''Get the root state machine in a states hierarchy.
-
-        :returns: Root state in the states hierarchy
-        :rtype: |StateMachine|
-
-        '''
-        machine = self
-        while machine.parent:
-            machine = machine.parent
-        return machine
 
     def add_transition(
             self, from_state, to_state, events, action=None,
@@ -668,7 +669,7 @@ class Validator(object):
             self.validate_set_initial(state)
 
     def _validate_state_already_added(self, state):
-        root_machine = self._machine.root_machine
+        root_machine = self._machine.root
         machines = deque()
         machines.append(root_machine)
         while machines:
@@ -702,7 +703,7 @@ class Validator(object):
             self._raise(msg)
 
     def _validate_to_state(self, to_state):
-        root_machine = self._machine.root_machine
+        root_machine = self._machine.root
         if to_state is None:
             return
         elif to_state is root_machine:

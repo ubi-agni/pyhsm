@@ -1,2 +1,0 @@
-# ROS imports
-import rospy

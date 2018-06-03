@@ -54,7 +54,7 @@ class HeatingState(StateMachine):
         self.add_state(toasting)
 
     def on_enter(self, event):
-        oven = event.kwargs['source_event'].kwargs['oven']
+        oven = event.userdata['source_event'].userdata['oven']
         if not oven.timer.is_alive():
             oven.start_timer()
         print('Heating on')
@@ -141,8 +141,6 @@ class Oven(object):
 
 
 def test_oven():
-    rospy.init_node('oven')
-
     oven = Oven()
     print(oven.state)
     assert oven.state == 'Off'
@@ -167,4 +165,5 @@ def test_oven():
 
 
 if __name__ == '__main__':
+    rospy.init_node('oven')
     test_oven()
