@@ -196,6 +196,63 @@ class State(object):
         return True
 
 
+class Container(State):
+    """Container interface.
+
+    Containers allow for hierarchical nesting of states.
+    """
+    def __init__(self, name):
+        super(Container, self).__init__(name)
+        self.states = set()
+
+    def __getitem__(self, key):
+        if isinstance(key, State):
+            return key
+
+        def find_by_name(name):
+            for state in self.states:
+                if state.name == name:
+                    return state
+            return None
+
+        keys = key.split('.', 1)
+        state = find_by_name(keys[0])
+        return state if len(keys) == 1 else state[keys[1]]
+
+    def add_state(self, state):
+        """Add a state to a state machine.
+
+        :param state: State to be added. It may be an another |StateMachine|
+        :type state: |State|
+        """
+        self.validate_add_state(state)
+        state.parent = self
+        self.states.add(state)
+
+    def add_states(self, *states):
+        """Add multiple `states` to the Container.
+
+        :param states: A list of states to be added
+        """
+        for state in states:
+            self.add_state(state)
+
+    def get_active_states(self):
+        """Get the subset of active states.
+
+        @rtype: list of |State|
+        """
+        raise NotImplementedError()
+
+    def validate(self):
+        """Check consistency of this container."""
+        raise NotImplementedError()
+
+    def validate_add_state(self, state):
+        if not isinstance(state, State):
+            raise StateMachineException(self, "Expecting State, but got {0}".format(type(state)))
+
+
 class TransitionsContainer(object):
     def __init__(self, machine):
         self._machine = machine
@@ -237,8 +294,8 @@ class Stack(object):
         return str(list(self.deque))
 
 
-class StateMachine(State):
-    '''State machine controls actions and transitions.
+class StateMachine(Container):
+    """State machine controls actions and transitions.
 
     To provide the State Pattern-like behavior, the formal state machine rules
     may be slightly broken, and instead of creating an `internal transition
@@ -332,26 +389,11 @@ class StateMachine(State):
 
     def __init__(self, name):
         super(StateMachine, self).__init__(name)
-        self.states = set()
         self.state = None
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.stack = Stack()
-
-    def __getitem__(self, key):
-        if isinstance(key, State):
-            return key
-
-        def findByName(name):
-            for state in self.states:
-                if state.name == name:
-                    return state
-            return None
-
-        keys = key.split('.', 1)
-        state = findByName(keys[0])
-        return state if len(keys) == 1 else state[keys[1]]
 
     def add_state(self, state, initial=False):
         '''Add a state to a state machine.
@@ -369,22 +411,8 @@ class StateMachine(State):
             state = State(state)
         Validator(self).validate_add_state(state, initial)
         state.initial = initial
-        state.parent = self
-        self.states.add(state)
+        super(StateMachine, self).add_state(state)
         return state
-
-    def add_states(self, *states):
-        '''Add `states` to the |StateMachine|.
-
-        To set the initial state use
-        :func:`set_initial_state`.
-
-        :param states: A list of states to be added
-        :type states: |State|
-
-        '''
-        for state in states:
-            self.add_state(state)
 
     def set_initial_state(self, state):
         '''Set an initial state in a state machine.
