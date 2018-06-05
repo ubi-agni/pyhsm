@@ -143,9 +143,9 @@ class Oven(object):
 
 def test_oven():
     oven = Oven()
-    sis = IntrospectionServer('server_name', oven.sm, 'Oven')
-
-    sis.start()
+    sis = IntrospectionServer('hsm_introspection', oven.sm, 'Oven')
+    sis_thread = threading.Thread(target=sis.start)
+    sis_thread.start()
 
     print(oven.state)
     assert oven.state == 'Off'
@@ -166,8 +166,8 @@ def test_oven():
     print(oven.state)
     assert oven.state == 'Off'
 
-    time.sleep(1)
-
+    time.sleep(10)
+    sis.stop()
 
 if __name__ == '__main__':
     rospy.init_node('oven')
