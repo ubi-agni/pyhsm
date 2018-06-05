@@ -3,7 +3,7 @@ from __future__ import print_function
 import threading
 import time
 
-from hsm.core import StateMachine, State, Event
+from hsm.core import State, Container, StateMachine, Event
 import logging
 logging.getLogger('pysm').setLevel(logging.INFO)
 
@@ -45,7 +45,7 @@ def rosSubscribe(state, topic, msg_type, handler):
 
 
 # It's possible to encapsulate all state related behaviour in a state class.
-class HeatingState(StateMachine):
+class HeatingState(Container):
     def __init__(self, name):
         super(HeatingState, self).__init__(name)
         baking = State('Baking')
@@ -73,7 +73,7 @@ class Oven(object):
     def _get_state_machine(self):
         oven = StateMachine('Oven')
 
-        door_closed = StateMachine('Door closed')
+        door_closed = Container('Door closed')
         oven.add_state(door_closed, initial=True)
         off = door_closed.add_state('Off', initial=True)
         heating = door_closed.add_state(HeatingState('Heating'))
@@ -160,8 +160,6 @@ def test_oven():
     time.sleep(0.2)
     print(oven.state)
     assert oven.state == 'Off'
-
-    time.sleep(1)
 
 
 if __name__ == '__main__':
