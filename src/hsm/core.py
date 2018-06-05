@@ -530,6 +530,7 @@ class StateMachine(Container):
     def __init__(self, name):
         super(StateMachine, self).__init__(name)
         self.state = None
+        self._transition_cbs = []
 
     def _get_transition(self, event):
         machine = self.leaf_state.parent
@@ -563,6 +564,21 @@ class StateMachine(Container):
                     states.append(child_state)
         self._enter_states(None, None, self.state)
 
+
+    def register_transition_cb(self, transition_cb, *args):
+        """Adds a transition callback to this container."""
+        self._transition_cbs.append((transition_cb, args))
+
+    def call_transition_cbs(self):
+        """Calls the registered transition callbacks.
+        Callback functions are called with two arguments in addition to any
+        user-supplied arguments:
+         - userdata
+         - a list of active states
+         """
+        for (cb, args) in self._transition_cbs:
+            cb(*args)
+
     def dispatch(self, event):
         '''Dispatch an event to a state machine.
 
@@ -587,6 +603,7 @@ class StateMachine(Container):
         transition['action'](leaf_state_before, event)
         self._enter_states(event, top_state, to_state)
         transition['after'](self.leaf_state, event)
+        self.call_transition_cbs()
 
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
@@ -658,6 +675,9 @@ class StateMachine(Container):
             self.leaf_state_stack.pop()
         except IndexError:
             return
+
+    def get_active_states(self):
+        return [self.state.name]
 
 
 class Validator(object):

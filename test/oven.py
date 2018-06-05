@@ -4,12 +4,13 @@ import threading
 import time
 
 from hsm.core import State, Container, StateMachine, Event
+from hsm.introspection import IntrospectionServer
+
 import logging
 logging.getLogger('pysm').setLevel(logging.INFO)
 
 import rospy
 from std_msgs.msg import String
-
 
 class ROSEvent(object):
     def __init__(self, topic, msg_type, handler):
@@ -64,7 +65,7 @@ class HeatingState(Container):
 
 
 class Oven(object):
-    TIMEOUT = 0.1
+    TIMEOUT = 6
 
     def __init__(self):
         self.sm = self._get_state_machine()
@@ -142,25 +143,35 @@ class Oven(object):
 
 def test_oven():
     oven = Oven()
+    sis = IntrospectionServer('hsm_introspection', oven.sm, 'Oven')
+    sis_thread = threading.Thread(target=sis.start)
+    sis_thread.start()
+
     print(oven.state)
     assert oven.state == 'Off'
-
+    time.sleep(5)
     oven.bake()
     print(oven.state)
     assert oven.state == 'Baking'
+
+    time.sleep(5)
 
     oven.open_door()
     print(oven.state)
     assert oven.state == 'Door open'
 
+    time.sleep(5)
     oven.close_door()
     print(oven.state)
     assert oven.state == 'Baking'
 
-    time.sleep(0.2)
+    time.sleep(7)
+
     print(oven.state)
     assert oven.state == 'Off'
 
+    time.sleep(5)
+    sis.stop()
 
 if __name__ == '__main__':
     rospy.init_node('oven')
