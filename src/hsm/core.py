@@ -19,7 +19,7 @@ from six import iteritems
 import collections
 from collections import deque
 import logging
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("hsm.core")
 _LOGGER.addHandler(logging.NullHandler())
 
 

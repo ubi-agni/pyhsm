@@ -5,45 +5,13 @@ import time
 
 from hsm.core import State, Container, StateMachine, Event
 from hsm.introspection import IntrospectionServer
+import hsm.ros  # augments hsm.core.State with ros_subscribe()
 
 import logging
 logging.getLogger('pysm').setLevel(logging.INFO)
 
 import rospy
 from std_msgs.msg import String
-
-class ROSEvent(object):
-    def __init__(self, topic, msg_type, handler):
-        self.topic = topic
-        self.msg_type = msg_type
-        self.handler = handler
-        self.subscriber = None
-
-
-def subscribe_ros_events(state, event):
-    # subscribe events
-    for e in state._ros_events:
-        print("subscribing to", e.topic)
-        e.subscriber = rospy.Subscriber(e.topic, e.msg_type, e.handler)
-
-
-def unsubscribe_ros_events(state, event):
-    # unsubscribe events
-    for e in state._ros_events:
-        del e.subscriber
-        print("unsubscribed from", e.topic)
-
-
-def rosSubscribe(state, topic, msg_type, handler):
-    if not hasattr(state, '_ros_events'):
-        # define _ros_events attribute
-        state._ros_events = []
-        # on enter, subscribe to topics
-        state.add_handler('enter', subscribe_ros_events)
-        # on exit, unsubscribe
-        state.add_handler('exit', unsubscribe_ros_events)
-    state._ros_events.append(ROSEvent(topic, msg_type, handler))
-
 
 # It's possible to encapsulate all state related behaviour in a state class.
 class HeatingState(Container):
@@ -91,7 +59,7 @@ class Oven(object):
         door_open.add_handler('exit', self.on_open_exit)
         door_open.add_handler('close', self.on_door_close)
 
-        rosSubscribe(oven, "chatter", String, self.handler)
+        oven.ros_subscribe("chatter", String, self.handler)
         oven.initialize()
         return oven
 
