@@ -65,7 +65,7 @@ class HeatingState(StateMachine):
 
 
 class Oven(object):
-    TIMEOUT = 0.1
+    TIMEOUT = 6
 
     def __init__(self):
         self.sm = self._get_state_machine()
@@ -149,24 +149,28 @@ def test_oven():
 
     print(oven.state)
     assert oven.state == 'Off'
-
+    time.sleep(5)
     oven.bake()
     print(oven.state)
     assert oven.state == 'Baking'
+
+    time.sleep(5)
 
     oven.open_door()
     print(oven.state)
     assert oven.state == 'Door open'
 
+    time.sleep(5)
     oven.close_door()
     print(oven.state)
     assert oven.state == 'Baking'
 
-    time.sleep(0.2)
+    time.sleep(7)
+
     print(oven.state)
     assert oven.state == 'Off'
 
-    time.sleep(10)
+    time.sleep(5)
     sis.stop()
 
 if __name__ == '__main__':
