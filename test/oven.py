@@ -4,13 +4,13 @@ import threading
 import time
 
 from hsm.core import StateMachine, State, Event
+from hsm.introspection import IntrospectionServer
+
 import logging
 logging.getLogger('pysm').setLevel(logging.INFO)
 
 import rospy
 from std_msgs.msg import String
-
-from introspection import IntrospectionServer
 
 class ROSEvent(object):
     def __init__(self, topic, msg_type, handler):
