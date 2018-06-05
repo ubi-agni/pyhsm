@@ -10,6 +10,7 @@ logging.getLogger('pysm').setLevel(logging.INFO)
 import rospy
 from std_msgs.msg import String
 
+from introspection import IntrospectionServer
 
 class ROSEvent(object):
     def __init__(self, topic, msg_type, handler):
@@ -142,6 +143,10 @@ class Oven(object):
 
 def test_oven():
     oven = Oven()
+    sis = IntrospectionServer('server_name', oven.sm, 'Oven')
+
+    sis.start()
+
     print(oven.state)
     assert oven.state == 'Off'
 
