@@ -1,24 +1,87 @@
 class HierarchicalDict(object):
-    def __init__(self, parent=None, *args, **kwargs):
-        self._dict = dict()
-        self.parent = parent
-        self.declare(*args, **kwargs)
+    """Hierarchical dictionary where values have to be declared before they can be assigned and retrieved.
 
-    def declare(self, *args, **kwargs):
-        self._dict.update(*args, **kwargs)
+    After declaration, assignments are done like in a regular dictionary.
+    When retrieving a declared key that is not contained in the dictionary, the search propagates upwards through the
+    parental hierarchy.
+    """
+
+    def __init__(self, parent=None, declare_sequence=None, **kwargs):
+        """Initialize a new hierarchical dictionary with the given parent and declare the keys given by update_sequence
+        and the remaining keyword arguments.
+        """
+        if declare_sequence is None:
+            declare_sequence = {}
+        self._setattr('_dict', dict())
+        self._setattr('parent', parent)
+        self.declare(declare_sequence, **kwargs)
+
+    def _setattr(self, key, value):
+        """Assign a new variable (not dictionary-/userdata!) with given name key and given value.
+
+        Use this to assign new variables as __setattr__ is overwritten for dict-behaviour.
+        If a variable with a key that coincides with a dictionary key is assigned using this method, the dictionary key
+        is not accessible and a KeyError will be raised on the next call of declare().
+        """
+        super(HierarchicalDict, self).__setattr__(key, value)
+
+    def declare(self, sequence, **kwargs):
+        """Declare dictionary-/userdata using the given sequence and keyword arguments.
+
+        Will not overwrite any already declared variables.
+        """
+        old_dict = self._dict.copy()
+        self._dict.update(sequence, **kwargs)
+        for key in old_dict:
+            self._dict[key] = old_dict[key]
 
     # __getattr__ works for attributes that are not predefined methods
     def __getattr__(self, key):
-        while self is not None:
-            try:
-                return self._dict[key]
-            except KeyError:
-                self = self.parent
+        """Retrieve either the class attribute or the value from the dictionary with the given key.
+
+        If the given key corresponds to a class attribute, its value is returned.
+        Otherwise, __getitem__() is called.
+        """
+        if key in self.__dict__:
+            return self.key
+        return self.__getitem__(key)
 
     def __setattr__(self, key, value):
+        """Assign the given value to the class attribute or dictionary value given by key.
+
+        If the given key corresponds to a class attribute, _setattr() is called and the behaviour is as usual.
+        Otherwise, __setitem__() is called.
+        """
         if key in self.__dict__:
-            raise KeyError("%s cannot be written" % key)
-        elif key in self._dict:
-            self._dict[key] = value
-        elif self.parent is None:
-            raise KeyError("%s was not declared" % key)
+            self._setattr(key, value)
+        else:
+            self.__setitem__(key, value)
+
+    def __getitem__(self, key):
+        """Retrieve either the value with the given key from the dictionary.
+
+        When retrieving from a key that is not declared in the dictionary, the search propagates upwards through the
+        parental hierarchy until either the key is found (and its value returned) or until no parent is left at which
+        point a KeyError is raised.
+        """
+        while self is not None:
+            if key in self._dict:
+                return self._dict[key]
+            else:
+                self = self.parent
+        raise KeyError('%s was not declared' % key)
+
+    def __setitem__(self, key, value):
+        """Assign the given value to the dictionary value given by key.
+
+        When assigning to a key that is not declared in the dictionary, the search propagates upwards through the
+        parental hierarchy until either the key is found (resulting in that parent's key's value being updated) or
+        until no parent is left at which point a KeyError is raised.
+        """
+        while self is not None:
+            if key in self._dict:
+                self._dict[key] = value
+                return
+            else:
+                self = self.parent
+        raise KeyError('%s was not declared' % key)
