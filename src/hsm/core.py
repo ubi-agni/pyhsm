@@ -204,6 +204,7 @@ class Container(State):
     def __init__(self, name):
         super(Container, self).__init__(name)
         self.states = set()
+        self._transition_cbs = []
 
     def __getitem__(self, key):
         if isinstance(key, State):
@@ -251,6 +252,29 @@ class Container(State):
     def validate_add_state(self, state):
         if not isinstance(state, State):
             raise StateMachineException(self, "Expecting State, but got {0}".format(type(state)))
+
+    def register_transition_cb(self, transition_cb, cb_args=[]):
+        """Adds a transition callback to this container.
+        Transition callbacks receive arguments:
+         - userdata
+         - local_userdata
+         - active_states
+         - *cb_args
+        """
+        self._transition_cbs.append((transition_cb,cb_args))
+
+    def call_transition_cbs(self):
+        """Calls the registered transition callbacks.
+        Callback functions are called with two arguments in addition to any
+        user-supplied arguments:
+         - userdata
+         - a list of active states
+         """
+        # try:
+        for (cb, args) in self._transition_cbs:
+            cb(None, self.get_active_states(), *args)
+        # except:
+        #     smach.logerr("Could not execute transition callback: " + traceback.format_exc())
 
 
 class TransitionsContainer(object):
@@ -606,6 +630,7 @@ class StateMachine(Container):
         transition['action'](leaf_state_before, event)
         self._enter_states(event, top_state, to_state)
         transition['after'](self.leaf_state, event)
+        self.call_transition_cbs()
 
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
@@ -677,6 +702,9 @@ class StateMachine(Container):
             self.leaf_state_stack.pop()
         except IndexError:
             return
+
+    def get_active_states(self):
+        return [self.state.name]
 
 
 class Validator(object):

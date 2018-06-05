@@ -20,7 +20,7 @@ STATUS_TOPIC = '/smach/container_status'
 INIT_TOPIC = '/smach/container_init'
 STRUCTURE_TOPIC = '/smach/container_structure'
 
-import core
+from hsm.core import Container
 
 # class IntrospectionClient():
 #     def get_servers(self):
@@ -146,7 +146,7 @@ class ContainerProxy():
 
         # Set transition callback
         #TODO
-        #container.register_transition_cb(self._transition_cb)
+        container.register_transition_cb(self._transition_cb)
 
         # Create thread to constantly publish
         self._status_pub_thread = threading.Thread(name=server_name + ':status_publisher', target=self._status_pub_loop)
@@ -303,11 +303,13 @@ class IntrospectionServer():
             path = ''
 
         # Get a list of children that are also containers
-        #for (label, child) in state.get_children().items():
+        #print('Current state: ',state.name, [s.name for s in state.states])
         for child in state.states:
+
             # If this is also a container, recurse into it
-            if isinstance(child, core.Container):
+            if isinstance(child, Container):
                 self.construct(server_name, child, path + '/' + child.name)
+
 
         # Publish initial state
         proxy._publish_status("Initial state")
