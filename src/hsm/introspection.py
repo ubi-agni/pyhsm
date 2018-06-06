@@ -191,11 +191,11 @@ class ContainerProxy():
         outcomes_from = []
         outcomes_to = []
 
-        for k,transitions in self._container._transitions._transitions.items():
-            for t in transitions:
-                internal_outcomes.append(k[1])
-                outcomes_from.append(t['from_state'].name)
-                outcomes_to.append(t['to_state'].name)
+        # for k,transitions in self._container._transitions._transitions.items():
+        #     for t in transitions:
+        #         internal_outcomes.append(k[1])
+        #         outcomes_from.append(t['from_state'].name)
+        #         outcomes_to.append(t['to_state'].name)
         container_outcomes = set()#self._container.get_registered_outcomes()
 
         # Construct structure message
@@ -222,11 +222,14 @@ class ContainerProxy():
             # print str(structure_msg)
             # Construct status message
             # print self._container.get_active_states()
+            active_state_names = []
+            if self._container.state != None:
+                active_state_names.append(self._container.state.name)
             state_msg = SmachContainerStatus(
                 Header(stamp=rospy.Time.now()),
                 path,
                 [self._container.initial_state.name],
-                [self._container.state.name],
+                active_state_names,
                 pickle.dumps(smach.UserData()._data, 2),
                 info_str)
             # Publish message
@@ -290,7 +293,6 @@ class IntrospectionServer():
             path = ''
 
         # Get a list of children that are also containers
-        #print('Current state: ',state.name, [s.name for s in state.states])
         for child in state.states:
 
             # If this is also a container, recurse into it
