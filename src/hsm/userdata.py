@@ -1,20 +1,18 @@
 class HierarchicalDict(object):
-    """Hierarchical dictionary where values have to be declared before they can be assigned and retrieved.
+    """Hierarchical dictionary
 
-    After declaration, assignments are done like in a regular dictionary.
-    When retrieving a declared key that is not contained in the dictionary, the search propagates upwards through the
-    parental hierarchy.
+    Variables can be get / set via attribute syntax: dict.var.
+    Variables need to be declared before they can be set.
+    If not defined in current dictionary, search proceeds in parent dictionary.
     """
 
-    def __init__(self, parent=None, declare_sequence=None, **kwargs):
-        """Initialize a new hierarchical dictionary with the given parent and declare the keys given by update_sequence
-        and the remaining keyword arguments.
+    def __init__(self, parent=None, **kwargs):
+        """Initialize a new hierarchical dictionary with the given parent
+           and declare the keys given by remaining keyword arguments.
         """
-        if declare_sequence is None:
-            declare_sequence = {}
         self._setattr('_dict', dict())
         self._setattr('parent', parent)
-        self.declare(declare_sequence, **kwargs)
+        self.declare(**kwargs)
 
     def _setattr(self, key, value):
         """Assign a new variable (not dictionary-/userdata!) with given name key and given value.
@@ -25,13 +23,13 @@ class HierarchicalDict(object):
         """
         super(HierarchicalDict, self).__setattr__(key, value)
 
-    def declare(self, sequence, **kwargs):
-        """Declare dictionary-/userdata using the given sequence and keyword arguments.
+    def declare(self, **kwargs):
+        """Declare variables (and their initial values) using the given keyword arguments.
 
-        Will not overwrite any already declared variables.
+        Will not overwrite already declared variables.
         """
         old_dict = self._dict.copy()
-        self._dict.update(sequence, **kwargs)
+        self._dict.update(**kwargs)
         for key in old_dict:
             self._dict[key] = old_dict[key]
 
