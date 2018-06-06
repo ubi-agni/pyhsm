@@ -400,7 +400,7 @@ class Container(State):
 
         Validator(self).validate_add_transition(from_state, to_state, events, input)
 
-        for event in events:
+        for event in listify(events):
             key = (from_state, event)
             transition = {
                 'from_state': from_state,
