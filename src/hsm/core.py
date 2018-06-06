@@ -248,6 +248,8 @@ class Container(State):
         self._transitions = TransitionsContainer(self)
         self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
         self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
+        # current local state:
+        self.state = None
 
     def __getitem__(self, key):
         if isinstance(key, State):
@@ -529,7 +531,6 @@ class StateMachine(Container):
 
     def __init__(self, name):
         super(StateMachine, self).__init__(name)
-        self.state = None
         self._transition_cbs = []
 
     def _get_transition(self, event):
@@ -619,7 +620,7 @@ class StateMachine(Container):
             exit_event._machine = self
             state._on(exit_event)
             state.parent.state_stack.push(state)
-            state.parent.state = state.parent.initial_state
+            state.parent.state = None
             state = state.parent
         return state
 
