@@ -2,18 +2,10 @@ from __future__ import print_function
 
 import threading
 import time
+import unittest
 
-from hsm.core import State, Container, StateMachine, Event
-from hsm.introspection import IntrospectionServer
-import hsm.ros  # augments hsm.core.State with ros_subscribe()
+from hsm import State, Container, StateMachine, Event
 
-import logging
-logging.getLogger('pysm').setLevel(logging.INFO)
-
-import rospy
-from std_msgs.msg import String
-
-# It's possible to encapsulate all state related behaviour in a state class.
 class HeatingState(Container):
     def __init__(self, name):
         super(HeatingState, self).__init__(name)
@@ -33,7 +25,7 @@ class HeatingState(Container):
 
 
 class Oven(object):
-    TIMEOUT = 6
+    TIMEOUT = 1
 
     def __init__(self):
         self.sm = self._get_state_machine()
@@ -59,7 +51,6 @@ class Oven(object):
         door_open.add_handler('exit', self.on_open_exit)
         door_open.add_handler('close', self.on_door_close)
 
-        oven.ros_subscribe("chatter", String, self.handler)
         oven.initialize()
         return oven
 
@@ -109,38 +100,24 @@ class Oven(object):
         self.sm.set_previous_leaf_state(event)
 
 
-def test_oven():
-    oven = Oven()
-    sis = IntrospectionServer('hsm_introspection', oven.sm, 'Oven')
-    sis_thread = threading.Thread(target=sis.start)
-    sis_thread.start()
+class OvenTest(unittest.TestCase):
+    def test(self):
+        oven = Oven()
 
-    print(oven.state)
-    assert oven.state == 'Off'
-    time.sleep(5)
-    oven.bake()
-    print(oven.state)
-    assert oven.state == 'Baking'
+        self.assertEquals(oven.state, 'Off')
 
-    time.sleep(5)
+        oven.bake()
+        self.assertEquals(oven.state, 'Baking')
 
-    oven.open_door()
-    print(oven.state)
-    assert oven.state == 'Door open'
+        oven.open_door()
+        self.assertEquals(oven.state, 'Door open')
 
-    time.sleep(5)
-    oven.close_door()
-    print(oven.state)
-    assert oven.state == 'Baking'
+        oven.close_door()
+        self.assertEquals(oven.state, 'Baking')
 
-    time.sleep(7)
+        time.sleep(Oven.TIMEOUT + 0.5)
+        self.assertEquals(oven.state, 'Off')
 
-    print(oven.state)
-    assert oven.state == 'Off'
-
-    time.sleep(5)
-    sis.stop()
 
 if __name__ == '__main__':
-    rospy.init_node('oven')
-    test_oven()
+    unittest.main()
