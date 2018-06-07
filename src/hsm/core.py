@@ -18,6 +18,8 @@ from six import iteritems
 
 import collections
 from collections import deque
+import Queue
+
 import logging
 _LOGGER = logging.getLogger("hsm.core")
 _LOGGER.addHandler(logging.NullHandler())
@@ -754,3 +756,29 @@ class Validator(object):
         if machine.states and not machine.initial_state:
             msg = 'Machine "{0}" has no initial state'.format(machine.name)
             self._raise(msg)
+
+
+def run(sm, final_state):
+    """Run the statemachine until the final state is reached. Events are dispatched a synchronous way.
+    """
+    if isinstance(final_state, string_types):
+        final_state = sm[final_state]
+
+    event_queue = Queue.Queue()
+    def dispatch_with_queue(event):
+        event_queue.put(event)
+
+    sm._dispatch = sm.dispatch
+    sm.dispatch = dispatch_with_queue
+
+    sm.initialize()
+    def finished():
+        return sm.leaf_state is final_state or sm.leaf_state.is_substate(final_state)
+
+    while not finished():
+        event = event_queue.get()
+        sm._dispatch(event)
+
+    print('finished')
+    sm.dispatch = sm._dispatch
+    del(sm._dispatch)
