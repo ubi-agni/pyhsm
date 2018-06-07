@@ -22,7 +22,6 @@ from threading import Thread
 
 import logging
 _LOGGER = logging.getLogger("hsm.core")
-_LOGGER.addHandler(logging.NullHandler())
 
 
 string_types = (str, unicode)
