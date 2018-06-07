@@ -621,7 +621,10 @@ class StateMachine(Container):
             _LOGGER.debug('exiting %s', state.name)
             exit_event = Event('exit', propagate=False, source_event=event)
             exit_event._machine = self
-            state._on(exit_event)
+            try: # TODO: really ignore all exceptions?
+                state._on(exit_event)
+            except: # ignore exceptions due to event being None
+                pass
             state.parent.state_stack.push(state)
             state.parent.state = None
             state = state.parent
@@ -643,7 +646,10 @@ class StateMachine(Container):
             _LOGGER.debug('entering %s', state.name)
             enter_event = Event('enter', propagate=False, source_event=event)
             enter_event._machine = self
-            state._on(enter_event)
+            try: # TODO: really ignore all exceptions?
+                state._on(enter_event)
+            except: # ignore exceptions due to event being None
+                pass
             if state.parent is not None:
                 state.parent.state = state
 
