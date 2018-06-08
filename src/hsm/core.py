@@ -92,23 +92,18 @@ class Event(object):
         return '<Event {0}, userdata={1}>'.format(self.name, self.userdata)
 
 
-class TransitionsContainer(object):
-    def __init__(self, machine):
-        self._machine = machine
-        self._transitions = collections.defaultdict(list)
+class TransitionsContainer(collections.defaultdict):
+    def __init__(self):
+        super(TransitionsContainer, self).__init__(list)
 
-    def add(self, key, transition):
-        self._transitions[key].append(transition)
+    def add(self, event, transition):
+        self[event].append(transition)
 
-    def get(self, event, leaf_state):
-        key = (leaf_state, event.name)
-        for transition in self._transitions[key]:
-            if transition['condition'](leaf_state, event) is True:
-                return transition
-        key = (leaf_state, any_event)
-        for transition in self._transitions[key]:
-            if transition['condition'](leaf_state, event) is True:
-                return transition
+    def get(self, event, from_state):
+        for key in [event.name, any_event]:
+            for transition in self[key]:
+                if transition['condition'](from_state, event) is True:
+                    return transition
         return None
 
 
@@ -168,7 +163,7 @@ class State(object):
         self.name = name
         self.parent = None
         self._handlers = {}
-        self._transitions = TransitionsContainer(self)
+        self._transitions = TransitionsContainer()
 
         # register handlers for methods with name "on_*"
         for trigger, value in iteritems(self.__class__.__dict__):
@@ -257,7 +252,6 @@ class State(object):
         Validator(self).validate_add_transition(self, target_state, events)
 
         transition = {
-            'from_state': self,
             'to_state': target_state,
             'condition': condition,
             'action': action,
@@ -265,8 +259,7 @@ class State(object):
             'after': after,
         }
         for event in events:
-            key = (self, event)
-            self._transitions.add(key, transition)
+            self._transitions.add(event, transition)
 
     def __repr__(self):
         return '<State {0} ({1})>'.format(self.name, hex(id(self)))
@@ -581,10 +574,9 @@ class StateMachine(Container):
         if transition is None:
             return
         to_state = transition['to_state']
-        from_state = transition['from_state']
 
         transition['before'](leaf_state_before, event)
-        top_state = self._exit_states(event, from_state, to_state)
+        top_state = self._exit_states(event, leaf_state_before, to_state)
         transition['action'](leaf_state_before, event)
         self._enter_states(event, top_state, to_state)
         transition['after'](self.leaf_state, event)

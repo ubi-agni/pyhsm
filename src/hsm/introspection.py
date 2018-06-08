@@ -193,10 +193,10 @@ class ContainerProxy():
         outcomes_from = []
         outcomes_to = []
 
-        for k,transitions in self._container._transitions._transitions.items():
+        for k,transitions in self._container._transitions.items():
             for t in transitions:
                 internal_outcomes.append(k[1])
-                outcomes_from.append(t['from_state'].name)
+                outcomes_from.append(self._container.name)
                 outcomes_to.append(t['to_state'].name)
         container_outcomes = set()#self._container.get_registered_outcomes()
 
