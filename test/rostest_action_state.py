@@ -44,9 +44,9 @@ class Compute(StateMachine):
         failed = self.add_state("failed")
 
         # switch between states
-        self.add_transition(compute, done, "SUCCEEDED", after=self.show_result)
-        self.add_transition(compute, done, any_event)
-        self.add_transition(done, compute, "compute")
+        compute.add_transition("SUCCEEDED", done, after=self.show_result)
+        compute.add_transition(any_event, done)
+        done.add_transition("compute", compute)
 
         self.register_transition_cb(self.on_transition)
         self.initialize()

@@ -18,9 +18,9 @@ class Compute(StateMachine):
         done.add_handler("enter", self.count)
 
         # switch between states
-        self.add_transition(compute, idle, "switch")
-        self.add_transition(idle, compute, "switch")
-        self.add_transition(compute, done, "done")
+        compute.add_transition("switch", idle)
+        compute.add_transition("done", done)
+        idle.add_transition("switch", compute)
 
         self.register_transition_cb(self.on_transition)
         self.initialize()

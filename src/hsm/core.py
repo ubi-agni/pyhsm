@@ -100,18 +100,14 @@ class TransitionsContainer(object):
     def add(self, key, transition):
         self._transitions[key].append(transition)
 
-    def get(self, event):
-        key = (self._machine.state, event.name)
-        return self._get_transition_matching_condition(key, event)
-
-    def _get_transition_matching_condition(self, key, event):
-        from_state = self._machine.leaf_state
+    def get(self, event, leaf_state):
+        key = (leaf_state, event.name)
         for transition in self._transitions[key]:
-            if transition['condition'](from_state, event) is True:
+            if transition['condition'](leaf_state, event) is True:
                 return transition
-        key = (self._machine.state, any_event)
+        key = (leaf_state, any_event)
         for transition in self._transitions[key]:
-            if transition['condition'](from_state, event) is True:
+            if transition['condition'](leaf_state, event) is True:
                 return transition
         return None
 
@@ -192,10 +188,8 @@ class State(object):
         if len(handlers) == 1:
             self._handlers[trigger] = handlers
 
-    def add_transition(
-            self, from_state, to_state, events, action=None,
-            condition=None, before=None, after=None):
-        """Add a transition to a state machine.
+    def add_transition(self, events, target_state, condition=None, action=None, before=None, after=None):
+        """Add a transition from self to target_state
 
         All callbacks take two arguments - `state` and `event`. See parameters
         description for details.
@@ -205,29 +199,12 @@ class State(object):
         condition callbacks. First met condition will trigger a transition, if
         no condition is met, no transition is performed.
 
-        :param from_state: Source state
-        :type from_state: |State|
-        :param to_state: Target state. If `None`, then it's an `internal
+        :param target_state: Target state. If `None`, then it's an `internal
             transition <https://en.wikipedia.org/wiki/UML_state_machine
             #Internal_transitions>`_
-        :type to_state: |State|, `None`
+        :type target_state: |State|, `None`
         :param events: List of events that trigger the transition
         :type events: |Iterable| of |Hashable|
-        :param input: List of inputs that trigger the transition. A transition
-            event may be associated with a specific input. i.e.: An event may
-            be ``parse`` and an input associated with it may be ``$``. May be
-            `None` (default), then every matched event name triggers a
-            transition.
-        :type input: `None`, |Iterable| of |Hashable|
-        :param action: Action callback that is called during the transition
-            after all states have been left but before the new one is entered.
-
-            `action` callback takes two arguments:
-
-                - state: Leaf state before transition
-                - event: Event that triggered the transition
-
-        :type action: |Callable|
         :param condition: Condition callback - if returns `True` transition may
             be initiated.
 
@@ -237,6 +214,15 @@ class State(object):
                 - event: Event that triggered the transition
 
         :type condition: |Callable|
+        :param action: Action callback that is called during the transition
+            after all states have been left but before the new one is entered.
+
+            `action` callback takes two arguments:
+
+                - state: Leaf state before transition
+                - event: Event that triggered the transition
+
+        :type action: |Callable|
         :param before: Action callback that is called right before the
             transition.
 
@@ -266,23 +252,20 @@ class State(object):
             after = self._nop
         if condition is None:
             condition = self._nop
-        # handle string names: retrieve State instances
-        from_state = self[from_state]
-        to_state = self[to_state]
 
         events = listify(events)
-        Validator(self).validate_add_transition(from_state, to_state, events, input)
+        Validator(self).validate_add_transition(self, target_state, events)
 
+        transition = {
+            'from_state': self,
+            'to_state': target_state,
+            'condition': condition,
+            'action': action,
+            'before': before,
+            'after': after,
+        }
         for event in events:
-            key = (from_state, event)
-            transition = {
-                'from_state': from_state,
-                'to_state': to_state,
-                'action': action,
-                'condition': condition,
-                'before': before,
-                'after': after,
-            }
+            key = (self, event)
             self._transitions.add(key, transition)
 
     def __repr__(self):
@@ -532,13 +515,13 @@ class StateMachine(Container):
         super(StateMachine, self).__init__(name)
         self._transition_cbs = []
 
-    def _get_transition(self, event):
-        machine = self.leaf_state.parent
-        while machine:
-            transition = machine._transitions.get(event)
-            if transition:
+    def _get_transition(self, event, leaf_state):
+        state = leaf_state
+        while state is not None:
+            transition = state._transitions.get(event, state)
+            if transition is not None:
                 return transition
-            machine = machine.parent
+            state = state.parent
         return None
 
     def initialize(self):
@@ -594,7 +577,7 @@ class StateMachine(Container):
         event._machine = self
         leaf_state_before = self.leaf_state
         leaf_state_before._on(event)
-        transition = self._get_transition(event)
+        transition = self._get_transition(event, leaf_state_before)
         if transition is None:
             return
         to_state = transition['to_state']
@@ -728,15 +711,14 @@ class Validator(object):
                        .format(state.name, added_state.name))
                 self._raise(msg)
 
-    def validate_add_transition(self, from_state, to_state, events, input):
+    def validate_add_transition(self, from_state, to_state, events):
         self._validate_from_state(from_state)
         self._validate_to_state(to_state)
         self._validate_events(events)
 
     def _validate_from_state(self, from_state):
-        if from_state not in self._machine.states:
-            msg = 'Unable to add transition from unknown state "{0}"'.format(
-                from_state.name)
+        if not isinstance(from_state, State):
+            msg = 'Unable to add transition from unknown state "{0}"'.format(from_state.name)
             self._raise(msg)
 
     def _validate_to_state(self, to_state):

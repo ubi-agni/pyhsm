@@ -41,10 +41,10 @@ class Oven(object):
 
         door_open = oven.add_state('Door open')
 
-        oven.add_transition(door_closed, heating['Toasting'], events=['toast'])
-        oven.add_transition(door_closed, heating['Baking'], events=['bake'])
-        oven.add_transition(door_closed, off, events=['off', 'timeout'])
-        oven.add_transition(door_closed, door_open, events=['open'])
+        door_closed.add_transition('toast', heating['Toasting'])
+        door_closed.add_transition('bake', heating['Baking'])
+        door_closed.add_transition(events=['off', 'timeout'], target_state=off)
+        door_closed.add_transition('open', door_open)
 
         # define enter/exit/event handlers as arbitrary callbacks
         door_open.add_handler('enter', self.on_open_enter)
