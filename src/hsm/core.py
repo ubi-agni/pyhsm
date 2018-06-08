@@ -172,6 +172,7 @@ class State(object):
         self.name = name
         self.parent = None
         self._handlers = {}
+        self._transitions = TransitionsContainer(self)
 
         # register handlers for methods with name "on_*"
         for trigger, value in iteritems(self.__class__.__dict__):
@@ -190,138 +191,6 @@ class State(object):
         handlers.append(func)
         if len(handlers) == 1:
             self._handlers[trigger] = handlers
-
-    def __repr__(self):
-        return '<State {0} ({1})>'.format(self.name, hex(id(self)))
-
-    @property
-    def root(self):
-        """Get the root state in a states hierarchy.
-
-        :returns: Root state in the states hierarchy
-        :rtype: |State|
-        """
-        while self.parent is not None:
-            self = self.parent
-        return self
-
-    def is_substate(self, state):
-        """Check whether the `state` is a substate of `self`.
-
-        Also `self` is considered a substate of `self`.
-
-        :param state: State to verify
-        :type state: |State|
-        :returns: `True` if `state` is a substate of `self`, `False` otherwise
-        :rtype: bool
-        """
-        parent = self
-        while parent:
-            if parent is state:
-                return True
-            parent = parent.parent
-        return False
-
-    def _on(self, event):
-        try:
-            handler = self._handlers[event.name]
-            event.propagate = False
-            _call(handler, self, event)
-        except KeyError:
-            pass  # event not handled in this state
-
-        # Never propagate exit/enter events, even if propagate is set to True
-        if (self.parent and event.propagate and
-                event.name not in ['exit', 'enter']):
-            self.parent._on(event)
-
-    def _nop(self, state, event):
-        return True
-
-
-class Container(State):
-    """Container interface.
-
-    Containers allow for hierarchical nesting of states.
-    """
-    def __init__(self, name):
-        super(Container, self).__init__(name)
-        self.states = set()
-        self._transitions = TransitionsContainer(self)
-        self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
-        self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
-        # current local state:
-        self.state = None
-
-    def __getitem__(self, key):
-        if isinstance(key, State):
-            return key
-
-        def find_by_name(name):
-            for state in self.states:
-                if state.name == name:
-                    return state
-            return None
-
-        keys = key.split('.', 1)
-        state = find_by_name(keys[0])
-        return state if len(keys) == 1 else state[keys[1]]
-
-    def add_state(self, state, initial=False):
-        """Add a state to a state the container.
-
-        If states are added, one (and only one) of them has to be declared as
-        `initial`.
-
-        :param state: State to be added. It may be an another |Container|
-        :type state: |State|
-        :param initial: Declare a state as initial
-        :type initial: bool
-        """
-        if isinstance(state, string_types):
-            state = State(state)
-        Validator(self).validate_add_state(state, initial)
-        state.initial = initial
-        state.parent = self
-        self.states.add(state)
-        return state
-
-    def add_states(self, *states):
-        """Add multiple `states` to the Container.
-
-        :param states: A list of states to be added
-        """
-        for state in states:
-            self.add_state(state)
-
-    @property
-    def initial_state(self):
-        """Get the initial state in a state machine.
-
-        :returns: Initial state in a state machine
-        :rtype: |State|
-
-        """
-        for state in self.states:
-            if state.initial:
-                return state
-        return None
-
-    def set_initial_state(self, state):
-        """Set an initial state in a state machine.
-
-        :param state: Set this state as initial in a state machine
-        :type state: |State|
-        """
-        Validator(self).validate_set_initial(state)
-        state.initial = True
-
-    def get_active_states(self):
-        """Get the subset of active states.
-
-        @rtype: list of |State|
-        """
-        raise NotImplementedError()
 
     def add_transition(
             self, from_state, to_state, events, action=None,
@@ -415,6 +284,134 @@ class Container(State):
                 'after': after,
             }
             self._transitions.add(key, transition)
+
+    def __repr__(self):
+        return '<State {0} ({1})>'.format(self.name, hex(id(self)))
+
+    @property
+    def root(self):
+        """Get the root state in a states hierarchy.
+
+        :returns: Root state in the states hierarchy
+        :rtype: |State|
+        """
+        while self.parent is not None:
+            self = self.parent
+        return self
+
+    def is_substate(self, state):
+        """Check whether the `state` is a substate of `self`.
+
+        Also `self` is considered a substate of `self`.
+
+        :param state: State to verify
+        :type state: |State|
+        :returns: `True` if `state` is a substate of `self`, `False` otherwise
+        :rtype: bool
+        """
+        parent = self
+        while parent:
+            if parent is state:
+                return True
+            parent = parent.parent
+        return False
+
+    def _on(self, event):
+        try:
+            handler = self._handlers[event.name]
+            event.propagate = False
+            _call(handler, self, event)
+        except KeyError:
+            pass  # event not handled in this state
+
+        # Never propagate exit/enter events, even if propagate is set to True
+        if (self.parent and event.propagate and
+                event.name not in ['exit', 'enter']):
+            self.parent._on(event)
+
+    def _nop(self, state, event):
+        return True
+
+
+class Container(State):
+    """Container interface.
+
+    Containers allow for hierarchical nesting of states.
+    """
+    def __init__(self, name):
+        super(Container, self).__init__(name)
+        self.states = set()
+        self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
+        self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
+        # current local state:
+        self.state = None
+
+    def __getitem__(self, key):
+        if isinstance(key, State):
+            return key
+
+        def find_by_name(name):
+            for state in self.states:
+                if state.name == name:
+                    return state
+            return None
+
+        keys = key.split('.', 1)
+        state = find_by_name(keys[0])
+        return state if len(keys) == 1 else state[keys[1]]
+
+    def add_state(self, state, initial=False):
+        """Add a state to a state the container.
+
+        If states are added, one (and only one) of them has to be declared as
+        `initial`.
+
+        :param state: State to be added. It may be an another |Container|
+        :type state: |State|
+        :param initial: Declare a state as initial
+        :type initial: bool
+        """
+        if isinstance(state, string_types):
+            state = State(state)
+        Validator(self).validate_add_state(state, initial)
+        state.initial = initial
+        state.parent = self
+        self.states.add(state)
+        return state
+
+    def add_states(self, *states):
+        """Add multiple `states` to the Container.
+
+        :param states: A list of states to be added
+        """
+        for state in states:
+            self.add_state(state)
+
+    @property
+    def initial_state(self):
+        """Get the initial state in a state machine.
+
+        :returns: Initial state in a state machine
+        :rtype: |State|
+
+        """
+        for state in self.states:
+            if state.initial:
+                return state
+        return None
+
+    def set_initial_state(self, state):
+        """Set an initial state in a state machine.
+
+        :param state: Set this state as initial in a state machine
+        :type state: |State|
+        """
+        Validator(self).validate_set_initial(state)
+        state.initial = True
+
+    def add_transition(self, events, target_state, *args, **kwargs):
+        # handle string names: retrieve State instances
+        super(Container, self).add_transition(events, self[target_state], *args, **kwargs)
 
     @property
     def leaf_state(self):
