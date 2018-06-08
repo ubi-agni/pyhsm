@@ -296,24 +296,23 @@ class Container(State):
 
     @property
     def initial_state(self):
-        '''Get the initial state in a state machine.
+        """Get the initial state in a state machine.
 
         :returns: Initial state in a state machine
         :rtype: |State|
 
-        '''
+        """
         for state in self.states:
             if state.initial:
                 return state
         return None
 
     def set_initial_state(self, state):
-        '''Set an initial state in a state machine.
+        """Set an initial state in a state machine.
 
         :param state: Set this state as initial in a state machine
         :type state: |State|
-
-        '''
+        """
         Validator(self).validate_set_initial(state)
         state.initial = True
 
@@ -327,7 +326,7 @@ class Container(State):
     def add_transition(
             self, from_state, to_state, events, action=None,
             condition=None, before=None, after=None):
-        '''Add a transition to a state machine.
+        """Add a transition to a state machine.
 
         All callbacks take two arguments - `state` and `event`. See parameters
         description for details.
@@ -387,7 +386,7 @@ class Container(State):
 
         :type after: |Callable|
 
-        '''
+        """
         # Rather than adding some if statements later on, let's just declare some
         # neutral items that will do nothing if called. It simplifies the logic a lot.
         if action is None:
@@ -419,7 +418,7 @@ class Container(State):
 
     @property
     def leaf_state(self):
-        '''Get the current leaf state.
+        """Get the current leaf state.
 
         The :attr:`~.StateMachine.state` property gives the current,
         local state in a state machine. The `leaf_state` goes to the bottom in
@@ -430,7 +429,7 @@ class Container(State):
         :returns: Leaf state in a hierarchical state machine
         :rtype: |State|
 
-        '''
+        """
         return self._get_leaf_state(self)
 
     def _get_leaf_state(self, state):
@@ -546,7 +545,7 @@ class StateMachine(Container):
         return None
 
     def initialize(self):
-        '''Initialize states in the state machine.
+        """Initialize states in the state machine.
 
         After a state machine has been created and all states are added to it,
         :func:`initialize` has to be called.
@@ -555,7 +554,7 @@ class StateMachine(Container):
         :func:`initialize` has to be called on a root
         state machine in the hierarchy.
 
-        '''
+        """
         states = deque()
         states.append(self)
         validator = Validator(self)
@@ -657,7 +656,7 @@ class StateMachine(Container):
 
 
     def set_previous_leaf_state(self, event=None):
-        '''Transition to a previous leaf state. This makes a dynamic transition
+        """Transition to a previous leaf state. This makes a dynamic transition
         to a historical state. The current `leaf_state` is saved on the stack
         of historical leaf states when calling this method.
 
@@ -665,7 +664,7 @@ class StateMachine(Container):
             transition
         :type event: :class:`.Event`
 
-        '''
+        """
         if event is not None:
             event._machine = self
         from_state = self.leaf_state
@@ -677,11 +676,11 @@ class StateMachine(Container):
         self._enter_states(event, top_state, to_state)
 
     def revert_to_previous_leaf_state(self, event=None):
-        '''Similar to :func:`set_previous_leaf_state`
+        """Similar to :func:`set_previous_leaf_state`
         but the current leaf_state is not saved on the stack of states. It
         allows to perform transitions further in the history of states.
 
-        '''
+        """
         self.set_previous_leaf_state(event)
         try:
             self.leaf_state_stack.pop()

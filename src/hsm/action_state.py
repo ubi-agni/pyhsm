@@ -12,7 +12,7 @@ _LOGGER = logging.getLogger("hsm.action_state")
 
 class ActionState(hsm.core.Container):
     """Simple action client state.
-    
+
     Use this class to represent an actionlib as a state in a state machine.
     """
 
@@ -26,7 +26,7 @@ class ActionState(hsm.core.Container):
     def __init__(self, action_name, action_spec, goal = None, name=None,
                  server_wait_timeout = 10.0):
         """Constructor for ActionState action client wrapper.
-        
+
         @type action_name: string
         @param action_name: The name of the action as it will be broadcast over ros.
 
