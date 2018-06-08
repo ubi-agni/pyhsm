@@ -107,23 +107,6 @@ class TransitionsContainer(collections.defaultdict):
         return None
 
 
-class Stack(object):
-    def __init__(self, maxlen=None):
-        self.deque = deque(maxlen=maxlen)
-
-    def pop(self):
-        return self.deque.pop()
-
-    def push(self, value):
-        self.deque.append(value)
-
-    def peek(self):
-        return self.deque[-1]
-
-    def __repr__(self):
-        return str(list(self.deque))
-
-
 class _History(object):
     def __init__(self, parent):
         self.parent = parent
@@ -494,8 +477,6 @@ class StateMachine(Container):
         state_machine.initialize()
         state_machine.dispatch(Event('on'))
     """
-
-    STACK_SIZE = 32
 
     def __init__(self, name):
         super(StateMachine, self).__init__(name)
