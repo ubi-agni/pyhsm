@@ -124,6 +124,11 @@ class Stack(object):
         return str(list(self.deque))
 
 
+class _History(object):
+    def __init__(self, parent):
+        self.parent = parent
+
+
 class State(object):
     """Represents a state in a state machine.
 
@@ -132,6 +137,17 @@ class State(object):
 
     It is encouraged to extend this class to encapsulate a state behavior,
     similarly to the State Pattern.
+
+    **Attributes:**
+
+        .. attribute:: state
+            Current, local state (instance of |State|) in a state machine.
+
+        .. attribute:: leaf_state
+            See the :attr:`~.StateMachine.leaf_state` property.
+
+        **root**
+            See the :attr:`~.StateMachine.root` property.
 
     :param name: Human readable state name
     :type name: str
@@ -314,13 +330,16 @@ class Container(State):
 
     Containers allow for hierarchical nesting of states.
     """
+
     def __init__(self, name):
         super(Container, self).__init__(name)
         self.states = set()
-        self.state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
-        self.leaf_state_stack = Stack(maxlen=StateMachine.STACK_SIZE)
-        # current local state:
+        # current local state
         self.state = None
+        # previous local state (for transitions to history)
+        self._prev_state = None
+        # special history state
+        self.HISTORY = _History(self)
 
     def __getitem__(self, key):
         if isinstance(key, State):
@@ -410,6 +429,18 @@ class Container(State):
             state = state.state
         return state
 
+    @property
+    def history_state(self):
+        """Get the history state of this |Container|.
+
+        :returns: Leaf state in a hierarchical state machine
+        :rtype: |State|
+        """
+        result = self
+        while hasattr(result, '_prev_state') and result._prev_state is not None:
+            result = result._prev_state
+        return result
+
 
 class StateMachine(Container):
     """State machine controls actions and transitions.
@@ -432,47 +463,9 @@ class StateMachine(Container):
         6. `enter` handlers
         7. `after` callback
 
-    If there's no handler in states or transition for an event, it is silently
-    ignored.
+    If there's no handler in states or transition for an event, it is silently ignored.
 
-    If using nested state machines, all events should be sent to the root state
-    machine.
-
-    **Attributes:**
-
-        .. attribute:: state
-
-            Current, local state (instance of |State|) in a state machine.
-
-        .. attribute:: stack
-
-            Stack that can be used if the `Pushdown Automaton (PDA)
-            <https://en.wikipedia.org/wiki/Pushdown_automaton>`_ functionality
-            is needed.
-
-        .. attribute:: state_stack
-
-            Stack of previous local states in a state machine. With every
-            transition, a previous state (instance of |State|) is pushed to the
-            `state_stack`. Only :attr:`.StateMachine.STACK_SIZE` (32
-            by default) are stored and old values are removed from the stack.
-
-        .. attribute:: leaf_state_stack
-
-            Stack of previous leaf states in a state machine. With every
-            transition, a previous leaf state (instance of |State|) is pushed
-            to the `leaf_state_stack`. Only
-            :attr:`.StateMachine.STACK_SIZE` (32 by default) are
-            stored and old values are removed from the stack.
-
-        **leaf_state**
-            See the :attr:`~.StateMachine.leaf_state` property.
-
-        **root**
-            See the :attr:`~.StateMachine.root` property.
-
-    :param name: Human readable state machine name
-    :type name: str
+    If using nested state machines, all events should be sent to the root state machine.
 
     .. note ::
 
@@ -569,11 +562,16 @@ class StateMachine(Container):
             event = Event(event)
         event._machine = self
         leaf_state_before = self.leaf_state
-        leaf_state_before._on(event)
+
+        # TODO: _on(event) handler and registered transitions should be mutually exclusive
+        # leaf_state_before._on(event)
+
         transition = self._get_transition(event, leaf_state_before)
         if transition is None:
             return
         to_state = transition['to_state']
+        if isinstance(to_state, _History):
+            to_state = to_state.parent.history_state
 
         transition['before'](leaf_state_before, event)
         top_state = self._exit_states(event, leaf_state_before, to_state)
@@ -586,7 +584,6 @@ class StateMachine(Container):
         if to_state is None:
             return None
         state = self.leaf_state
-        self.leaf_state_stack.push(state)
         while (state.parent and
                 not (from_state.is_substate(state) and
                      to_state.is_substate(state)) or
@@ -598,7 +595,7 @@ class StateMachine(Container):
                 state._on(exit_event)
             except: # ignore exceptions due to event being None
                 pass
-            state.parent.state_stack.push(state)
+            state.parent._prev_state = state
             state.parent.state = None
             state = state.parent
         return state
@@ -625,39 +622,6 @@ class StateMachine(Container):
                 pass
             if state.parent is not None:
                 state.parent.state = state
-
-
-    def set_previous_leaf_state(self, event=None):
-        """Transition to a previous leaf state. This makes a dynamic transition
-        to a historical state. The current `leaf_state` is saved on the stack
-        of historical leaf states when calling this method.
-
-        :param event: (Optional) event that is passed to states involved in the
-            transition
-        :type event: :class:`.Event`
-
-        """
-        if event is not None:
-            event._machine = self
-        from_state = self.leaf_state
-        try:
-            to_state = self.leaf_state_stack.peek()
-        except IndexError:
-            return
-        top_state = self._exit_states(event, from_state, to_state)
-        self._enter_states(event, top_state, to_state)
-
-    def revert_to_previous_leaf_state(self, event=None):
-        """Similar to :func:`set_previous_leaf_state`
-        but the current leaf_state is not saved on the stack of states. It
-        allows to perform transitions further in the history of states.
-
-        """
-        self.set_previous_leaf_state(event)
-        try:
-            self.leaf_state_stack.pop()
-        except IndexError:
-            return
 
     def get_active_states(self):
         return [self.state.name]
@@ -719,9 +683,11 @@ class Validator(object):
             return
         elif to_state is root_machine:
             return
-        elif not to_state.is_substate(root_machine):
-            msg = 'Unable to add transition to unknown state "{0}"'.format(
-                to_state.name)
+        elif isinstance(to_state, _History):
+            to_state = to_state.parent  # check for existence of parent
+
+        if not to_state.is_substate(root_machine):
+            msg = 'Unable to add transition to unknown state "{0}"'.format(to_state.name)
             self._raise(msg)
 
     def _validate_events(self, events):

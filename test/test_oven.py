@@ -46,10 +46,12 @@ class Oven(object):
         door_closed.add_transition(events=['off', 'timeout'], target_state=off)
         door_closed.add_transition('open', door_open)
 
+        # trigger transition to HISTORY state
+        door_open.add_transition('close', door_closed.HISTORY)
+
         # define enter/exit/event handlers as arbitrary callbacks
         door_open.add_handler('enter', self.on_open_enter)
         door_open.add_handler('exit', self.on_open_exit)
-        door_open.add_handler('close', self.on_door_close)
 
         oven.initialize()
         return oven
@@ -94,10 +96,6 @@ class Oven(object):
     def on_open_exit(self, state, event):
         print('Closing door')
         self.light_off()
-
-    def on_door_close(self, state, event):
-        # Transition to a history state
-        self.sm.set_previous_leaf_state(event)
 
 
 class OvenTest(unittest.TestCase):
