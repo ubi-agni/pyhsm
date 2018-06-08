@@ -20,6 +20,7 @@ STATUS_TOPIC = '/smach/container_status'
 INIT_TOPIC = '/smach/container_init'
 STRUCTURE_TOPIC = '/smach/container_structure'
 TRANSITION_TOPIC = '/smach/transition'
+EVENT_TOPIC = '/smach/event'
 
 from hsm.core import Container
 
@@ -192,11 +193,11 @@ class ContainerProxy():
         outcomes_from = []
         outcomes_to = []
 
-        # for k,transitions in self._container._transitions._transitions.items():
-        #     for t in transitions:
-        #         internal_outcomes.append(k[1])
-        #         outcomes_from.append(t['from_state'].name)
-        #         outcomes_to.append(t['to_state'].name)
+        for k,transitions in self._container._transitions._transitions.items():
+            for t in transitions:
+                internal_outcomes.append(k[1])
+                outcomes_from.append(t['from_state'].name)
+                outcomes_to.append(t['to_state'].name)
         container_outcomes = set()#self._container.get_registered_outcomes()
 
         # Construct structure message
@@ -275,16 +276,21 @@ class IntrospectionServer():
         self._server_name = server_name
         self._machine = machine
         self._path = path
-        self._transition_cmd = rospy.Subscriber(
-            server_name + TRANSITION_TOPIC,
-            String,
-            self._transition_cmd_cb)
+
 
 
     def start(self):
         # Construct proxies
         proxy = self.construct(self._server_name, self._machine, self._path)
         self._machine.register_transition_cb(self._transition_cb, proxy)
+        self._transition_cmd = rospy.Subscriber(
+            self._server_name + TRANSITION_TOPIC,
+            String,
+            self._transition_cmd_cb)
+        self._transition_cmd = rospy.Subscriber(
+            self._server_name + EVENT_TOPIC,
+            String,
+            self._event_trigger_cb)
 
     def stop(self):
         for proxy in self._proxies:
@@ -337,3 +343,6 @@ class IntrospectionServer():
             top_state = self._machine._exit_states(None, from_state, to_state)
             self._machine._enter_states(None, top_state, to_state)
             self._machine.call_transition_cbs()
+
+    def _event_trigger_cb(self, msg):
+        self._machine.dispatch(msg.data)
