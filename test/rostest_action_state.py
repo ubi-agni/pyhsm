@@ -6,6 +6,7 @@ import grasping_msgs.msg, geometry_msgs.msg, shape_msgs.msg
 import time
 import rospy
 import unittest
+import rostest
 import logging
 
 
@@ -124,4 +125,4 @@ if __name__ == '__main__':
     log.setLevel(logging.DEBUG)
 
     rospy.init_node("action_client")
-    unittest.main()
+    rostest.rosrun("", "", ActionStateTest)
