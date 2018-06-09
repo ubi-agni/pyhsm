@@ -567,6 +567,12 @@ class StateMachine(Container):
         transition['after'](self.leaf_state, event)
         self.call_transition_cbs()
 
+    def _transition_to(self, to_state):
+        """manual transition to given state"""
+        top_state = self._exit_states(None, self.leaf_state, to_state)
+        self._enter_states(None, top_state, to_state)
+        self.call_transition_cbs()
+
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:
             return None

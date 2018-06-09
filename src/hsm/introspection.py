@@ -338,11 +338,7 @@ class IntrospectionServer():
             rospy.logerr('Unknown state %s' % msg.data)
             return
 
-        if to_state:
-            from_state = self._machine.leaf_state
-            top_state = self._machine._exit_states(None, from_state, to_state)
-            self._machine._enter_states(None, top_state, to_state)
-            self._machine.call_transition_cbs()
+        self._machine._transition_to(to_state)
 
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
