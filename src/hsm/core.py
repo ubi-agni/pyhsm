@@ -291,6 +291,10 @@ class State(object):
             parent = parent.parent
         return False
 
+    def is_active(self):
+        # state is active if its the root, or if its parent's state is self
+        return self.parent is None or self.parent.state is self
+
     def _on(self, event):
         try:
             handler = self._handlers[event.name]
@@ -506,10 +510,12 @@ class StateMachine(Container):
         states.append(self)
         validator = Validator(self)
         while states:
-            machine = states.popleft()
-            validator.validate_initial_state(machine)
-            machine.state = machine.initial_state
-            for child_state in machine.states:
+            state = states.popleft()
+            validator.validate_initial_state(state)
+            if state.is_active():
+                state.state = state.initial_state
+
+            for child_state in state.states:
                 if isinstance(child_state, Container):
                     states.append(child_state)
         self._enter_states(None, None, self.state)
