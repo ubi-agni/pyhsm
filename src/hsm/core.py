@@ -416,9 +416,7 @@ class Container(State):
         :rtype: |State|
 
         """
-        return self._get_leaf_state(self)
-
-    def _get_leaf_state(self, state):
+        state = self
         while hasattr(state, 'state') and state.state is not None:
             state = state.state
         return state
@@ -603,9 +601,17 @@ class StateMachine(Container):
     def _enter_states(self, event, top_state, to_state):
         if to_state is None:
             return
-        path = []
-        state = self._get_leaf_state(to_state)
 
+        # descend to initial state
+        while isinstance(to_state, Container):
+            initial = to_state.initial_state
+            if initial is None:
+                break
+            to_state = initial
+
+        # find path from top_state to to_state
+        path = []
+        state = to_state
         while state.parent and state != top_state:
             path.append(state)
             state = state.parent
