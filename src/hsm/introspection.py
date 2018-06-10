@@ -321,7 +321,7 @@ class IntrospectionServer():
         """Clear all proxies in this server."""
         self._proxies = []
 
-    def _transition_cb(self, proxy):
+    def _transition_cb(self, from_state, to_state, proxy):
         proxy._publish_status()
 
     def _transition_cmd_cb(self, msg):

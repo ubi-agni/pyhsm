@@ -530,7 +530,7 @@ class StateMachine(Container):
         """Adds a transition callback to this container."""
         self._transition_cbs.append((transition_cb, args))
 
-    def call_transition_cbs(self):
+    def call_transition_cbs(self, from_state, to_state):
         """Calls the registered transition callbacks.
         Callback functions are called with two arguments in addition to any
         user-supplied arguments:
@@ -538,7 +538,7 @@ class StateMachine(Container):
          - a list of active states
          """
         for (cb, args) in self._transition_cbs:
-            cb(*args)
+            cb(from_state, to_state, *args)
 
     def dispatch(self, event):
         """Dispatch an event to a state machine.
@@ -569,14 +569,16 @@ class StateMachine(Container):
         top_state = self._exit_states(event, leaf_state_before, to_state)
         transition['action'](leaf_state_before, event)
         self._enter_states(event, top_state, to_state)
-        transition['after'](self.leaf_state, event)
-        self.call_transition_cbs()
+        leaf_state_after = self.leaf_state
+        transition['after'](leaf_state_after, event)
+        self.call_transition_cbs(leaf_state_before, leaf_state_after)
 
     def _transition_to(self, to_state):
         """manual transition to given state"""
-        top_state = self._exit_states(None, self.leaf_state, to_state)
+        leaf_state_before = self.leaf_state
+        top_state = self._exit_states(None, leaf_state_before, to_state)
         self._enter_states(None, top_state, to_state)
-        self.call_transition_cbs()
+        self.call_transition_cbs(leaf_state_before, self.leaf_state)
 
     def _exit_states(self, event, from_state, to_state):
         if to_state is None:

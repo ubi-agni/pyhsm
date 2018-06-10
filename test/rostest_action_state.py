@@ -56,8 +56,8 @@ class Compute(StateMachine):
         self.done_count += 1
         log.debug("{} grasps found".format(len(event.userdata['result'].grasps)))
 
-    def on_transition(self):
-        log.debug("entered state: {}".format(self.leaf_state.name))
+    def on_transition(self, from_state, to_state):
+        log.debug("entered state: {}".format(to_state.name))
 
 
 class ActionStateTest(unittest.TestCase):

@@ -35,8 +35,8 @@ class Compute(StateMachine):
     def count(self, state, event):
         self.done_count += 1
 
-    def on_transition(self):
-        print(self.current)
+    def on_transition(self, from_state, to_state):
+        print(to_state.name)
 
     @property
     def current(self):
