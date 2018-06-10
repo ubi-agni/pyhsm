@@ -221,17 +221,12 @@ class ContainerProxy():
         with self._status_pub_lock:
             path = self._path
 
-            # print str(structure_msg)
             # Construct status message
-            # print self._container.get_active_states()
-            active_state_names = []
-            if self._container.state != None:
-                active_state_names.append(self._container.state.name)
             state_msg = SmachContainerStatus(
                 Header(stamp=rospy.Time.now()),
                 path,
-                [self._container.initial_state.name],
-                active_state_names,
+                [state.name for state in self._container.get_initial_states()],
+                [state.name for state in self._container.get_active_states()],
                 pickle.dumps(smach.UserData()._data, 2),
                 info_str)
             # Publish message

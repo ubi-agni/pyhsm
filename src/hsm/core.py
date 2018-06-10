@@ -391,6 +391,13 @@ class Container(State):
         Validator(self).validate_set_initial(state)
         state.initial = True
 
+    def get_initial_states(self):
+        initial = self.initial_state
+        return [] if initial is None else [initial]
+
+    def get_active_states(self):
+        return [] if self.state is None else [self.state]
+
     def add_transition(self, events, target_state, *args, **kwargs):
         # handle string names: retrieve State instances
         super(Container, self).add_transition(events, self[target_state], *args, **kwargs)
@@ -615,9 +622,6 @@ class StateMachine(Container):
                 pass
             if state.parent is not None:
                 state.parent.state = state
-
-    def get_active_states(self):
-        return [self.state.name]
 
 
 class Validator(object):
