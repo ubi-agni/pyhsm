@@ -18,11 +18,11 @@ from six import iteritems
 
 import collections
 from collections import deque
+from threading import Thread
 import Queue
 
 import logging
 _LOGGER = logging.getLogger("hsm.core")
-_LOGGER.addHandler(logging.NullHandler())
 
 
 string_types = (str, unicode)
@@ -584,7 +584,7 @@ class StateMachine(Container):
             cb(*args)
 
     def dispatch(self, event):
-        '''Dispatch an event to a state machine.
+        """Dispatch an event to a state machine.
 
         If using nested state machines (HSM), it has to be called on a root
         state machine in the hierarchy.
@@ -592,7 +592,9 @@ class StateMachine(Container):
         :param event: Event to be dispatched
         :type event: :class:`.Event`
 
-        '''
+        """
+        if isinstance(event, string_types):
+            event = Event(event)
         event._machine = self
         leaf_state_before = self.leaf_state
         leaf_state_before._on(event)
@@ -762,6 +764,66 @@ class Validator(object):
         if machine.states and not machine.initial_state:
             msg = 'Machine "{0}" has no initial state'.format(machine.name)
             self._raise(msg)
+
+
+class ProcessorThread(Thread):
+    def __init__(self, state, event):
+        super(ProcessorThread, self).__init__()
+        self.state = state
+        self.event = event
+        self.interrupted = False
+
+    def run(self):
+        result = self.state.execute(self.event)
+        if not self.interrupted:
+            self.state.root.dispatch(Event(result))
+
+
+class ProcessingState(State):
+    def __init__(self, name):
+        """State executing a procedure in a background thread
+
+        The result of execute() method is triggered as a new event in the state machine.
+        The state can be left at any time during execution of the procedure (due to an event triggering a transition).
+        In this case the cancel flag is set to True, indicating that the Thread's result is not needed anymore.
+        """
+        super(ProcessingState, self).__init__(name)
+        self._thread = None
+        self.preempt_requested = False
+        self.add_handler('enter',self._on_enter)
+        self.add_handler('exit', self._on_exit)
+
+    def execute(self, event):
+        """Method executed while this state is active
+
+        The return value of this function triggers a corresponding event.
+        """
+        raise NotImplementedError()
+
+    def request_preempt(self):
+        self.preempt_requested = True
+
+    def _on_enter(self, state, event):
+        self.preempt_requested = False
+        self._thread = ProcessorThread(self, event)
+        self._thread.start()
+
+    def _on_exit(self, state, event):
+        # indicate that the thread should cancel
+        self._thread.interrupted = True
+        self.request_preempt()
+
+
+class CallbackState(ProcessingState):
+    def __init__(self, name, callback, *args, **kwargs):
+        """State executing a given function while being active."""
+        super(CallbackState,self).__init__(name)
+        self._cb = callback
+        self._args = args
+        self._kwargs = kwargs
+
+    def execute(self, event = None):
+        return self._cb(event, *self._args, **self._kwargs)
 
 
 def run(sm, final_state):

@@ -1,0 +1,5 @@
+<launch>
+	<include file="$(find agni_grasp_manager)/launch/grasp_provider_shadow.launch"/>
+
+	<test pkg="hsm" type="rostest_action_state.py" test-name="rostest_action_state"/>
+</launch>
