@@ -296,12 +296,10 @@ class State(object):
         return self.parent is None or self.parent.state is self
 
     def _on(self, event):
-        try:
-            handler = self._handlers[event.name]
+        handler = self._handlers.get(event.name, None)
+        if handler:
             event.propagate = False
             _call(handler, self, event)
-        except KeyError:
-            pass  # event not handled in this state
 
         # Never propagate exit/enter events, even if propagate is set to True
         if (self.parent and event.propagate and
@@ -591,10 +589,7 @@ class StateMachine(Container):
             _LOGGER.debug('exiting %s', state.name)
             exit_event = Event('exit', propagate=False, source_event=event)
             exit_event._machine = self
-            try: # TODO: really ignore all exceptions?
-                state._on(exit_event)
-            except: # ignore exceptions due to event being None
-                pass
+            state._on(exit_event)
             state.parent._prev_state = state
             state.parent.state = None
             state = state.parent
@@ -624,10 +619,7 @@ class StateMachine(Container):
             _LOGGER.debug('entering %s', state.name)
             enter_event = Event('enter', propagate=False, source_event=event)
             enter_event._machine = self
-            try: # TODO: really ignore all exceptions?
-                state._on(enter_event)
-            except: # ignore exceptions due to event being None
-                pass
+            state._on(enter_event)
             if state.parent is not None:
                 state.parent.state = state
 
