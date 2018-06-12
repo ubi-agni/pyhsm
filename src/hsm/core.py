@@ -296,14 +296,17 @@ class State(object):
         return self.parent is None or self.parent.state is self
 
     def _on(self, event):
+        # when calling enter/exit handlers pass the original event
+        is_enter_exit_event = event.name in ['exit', 'enter']
+        e = event.userdata['source_event'] if is_enter_exit_event else event
+
         handler = self._handlers.get(event.name, None)
         if handler:
-            event.propagate = False
-            _call(handler, self, event)
+            e.propagate = False
+            _call(handler, self, e)
 
         # Never propagate exit/enter events, even if propagate is set to True
-        if (self.parent and event.propagate and
-                event.name not in ['exit', 'enter']):
+        if self.parent and e.propagate and not is_enter_exit_event:
             self.parent._on(event)
 
     def _nop(self, state, event):
@@ -521,7 +524,7 @@ class StateMachine(Container):
             for child_state in state.states:
                 if isinstance(child_state, Container):
                     states.append(child_state)
-        self._enter_states(None, None, self.state)
+        self._enter_states(Event(None), None, self.state)
 
 
     def register_transition_cb(self, transition_cb, *args):
@@ -709,7 +712,9 @@ class ProcessorThread(Thread):
     def run(self):
         result = self.state.execute(self.event)
         if not self.interrupted:
-            self.state.root.dispatch(Event(result))
+            if not isinstance(result, Event):
+                result = Event(result)
+            self.state.root.dispatch(result)
 
 
 class ProcessingState(State):

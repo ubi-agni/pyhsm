@@ -15,7 +15,7 @@ class HeatingState(Container):
         self.add_state(toasting)
 
     def on_enter(self, event):
-        oven = event.userdata['source_event'].userdata['oven']
+        oven = event.userdata['oven']
         if not oven.timer.is_alive():
             oven.start_timer()
         print('Heating on')
