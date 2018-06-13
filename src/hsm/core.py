@@ -302,11 +302,12 @@ class State(object):
 
         handler = self._handlers.get(event.name, None)
         if handler:
-            e.propagate = False
+            if e is not None:
+                e.propagate = False
             _call(handler, self, e)
 
         # Never propagate exit/enter events, even if propagate is set to True
-        if self.parent and e.propagate and not is_enter_exit_event:
+        if not is_enter_exit_event and self.parent and e.propagate :
             self.parent._on(event)
 
     def _nop(self, state, event):
@@ -557,7 +558,7 @@ class StateMachine(Container):
         leaf_state_before = self.leaf_state
 
         # TODO: _on(event) handler and registered transitions should be mutually exclusive
-        # leaf_state_before._on(event)
+        leaf_state_before._on(event)
 
         transition = self._get_transition(event, leaf_state_before)
         if transition is None:
@@ -574,11 +575,11 @@ class StateMachine(Container):
         transition['after'](leaf_state_after, event)
         self.call_transition_cbs(leaf_state_before, leaf_state_after)
 
-    def _transition_to(self, to_state):
+    def _transition_to(self, to_state, event):
         """manual transition to given state"""
         leaf_state_before = self.leaf_state
-        top_state = self._exit_states(None, leaf_state_before, to_state)
-        self._enter_states(None, top_state, to_state)
+        top_state = self._exit_states(event, leaf_state_before, to_state)
+        self._enter_states(event, top_state, to_state)
         self.call_transition_cbs(leaf_state_before, self.leaf_state)
 
     def _exit_states(self, event, from_state, to_state):
@@ -785,6 +786,5 @@ def run(sm, final_state):
         event = event_queue.get()
         sm._dispatch(event)
 
-    print('finished')
     sm.dispatch = sm._dispatch
     del(sm._dispatch)

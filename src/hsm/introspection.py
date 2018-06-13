@@ -1,13 +1,9 @@
-import roslib
-
-#roslib.load_manifest('smach_ros')
 import rospy
 from std_msgs.msg import Header, String
 
 import pickle
 import threading
-
-import rostopic
+import hsm
 import smach
 
 from smach_msgs.msg import SmachContainerStatus, SmachContainerInitialStatusCmd, SmachContainerStructure
@@ -277,15 +273,17 @@ class IntrospectionServer():
     def start(self):
         # Construct proxies
         proxy = self.construct(self._server_name, self._machine, self._path)
+        # get informed about transitions
         self._machine.register_transition_cb(self._transition_cb, proxy)
+        # handle __TRANSITION__ events
+        self._machine.add_handler('__TRANSITION__', self._transition_handler)
+
         self._transition_cmd = rospy.Subscriber(
             self._server_name + TRANSITION_TOPIC,
-            String,
-            self._transition_cmd_cb)
+            String, self._transition_cmd_cb)
         self._transition_cmd = rospy.Subscriber(
             self._server_name + EVENT_TOPIC,
-            String,
-            self._event_trigger_cb)
+            String, self._event_trigger_cb)
 
     def stop(self):
         for proxy in self._proxies:
@@ -333,7 +331,11 @@ class IntrospectionServer():
             rospy.logerr('Unknown state %s' % msg.data)
             return
 
-        self._machine._transition_to(to_state)
+        # dispatch an event to trigger the transition (don't call _transition_to() directly!)
+        self._machine.dispatch(hsm.Event('__TRANSITION__', to_state=to_state))
 
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
+
+    def _transition_handler(self, state, event):
+        self._machine._transition_to(event.userdata['to_state'], event=None)
