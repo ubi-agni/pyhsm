@@ -37,7 +37,7 @@ def _ros_subscribe(state, topic, msg_type, handler):
         state.add_handler('exit', _unsubscribe_ros_events)
 
     # a string "handler" is interpreted as an event to be triggered
-    if handler in string_types:
+    if isinstance(handler, string_types):
         handler = lambda data: state.root.dispatch(Event(handler, msg=data))
 
     # actually register the event

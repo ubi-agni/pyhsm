@@ -1,16 +1,15 @@
-import hsm.core
+import hsm
 import rospy
 import threading
 import logging
 import copy
 import sys
-
-from actionlib.simple_action_client import SimpleActionClient, GoalStatus
+import actionlib
 
 __all__ = ['ActionState']
 _LOGGER = logging.getLogger("hsm.action_state")
 
-class ActionState(hsm.core.Container):
+class ActionState(hsm.Container):
     """Simple action client state.
 
     Use this class to represent an actionlib as a state in a state machine.
@@ -23,9 +22,12 @@ class ActionState(hsm.core.Container):
     ACTIVE = 3
     EXITING = 4
 
-    def __init__(self, action_name, action_spec, goal = None, name=None,
-                 server_wait_timeout = 10.0):
+    def __init__(self, client=None, action_name=None, action_spec=None,
+                 goal = None, name=None, server_wait_timeout = 10.0):
         """Constructor for ActionState action client wrapper.
+
+        @type client: actionlib.SimpleActionClient
+        @param client: SimpleActionClient instance to use.
 
         @type action_name: string
         @param action_name: The name of the action as it will be broadcast over ros.
@@ -41,25 +43,25 @@ class ActionState(hsm.core.Container):
         @param server_wait_timeout: This is the timeout used for aborting while
         waiting for an action server to become active.
         """
-        if name is None:
-            name = action_name
+        if client is not None and (action_name is not None or action_spec is not None):
+            raise ValueError('Cannot handle both, client and action arguments')
+
+        if isinstance(client, actionlib.SimpleActionClient):
+            self._action_client = client
+        else:
+            self._action_client = actionlib.SimpleActionClient(action_name, action_spec)
+        self._action_name = self._action_client .action_client.ns
 
         # Initialize base class
-        super(ActionState, self).__init__(name)
+        super(ActionState, self).__init__(name if name is not None else self._action_name)
 
-        # Set action properties
-        self._action_name = action_name
-        self._action_spec = action_spec
-        self.goal = goal
-        if goal is None:
-            self.goal = copy.copy(action_spec().action_goal.goal)
+        self.goal = goal if goal is not None else copy.copy(self._action_client.action_client.ActionGoal())
 
         self._status = ActionState.WAITING_FOR_SERVER
         self._server_wait_timeout = rospy.Duration(server_wait_timeout)
 
-        # Construct action client, and wait for it to come active
-        self._action_client = SimpleActionClient(action_name, action_spec)
-        self._action_wait_thread = threading.Thread(name=action_name + '/wait_for_server', target=self._wait_for_server)
+        # Wait for action client to become active
+        self._action_wait_thread = threading.Thread(name=self._action_name + '/wait_for_server', target=self._wait_for_server)
         self._action_wait_thread.start()
 
         self.add_handler('enter',self._on_enter)
@@ -112,7 +114,8 @@ class ActionState(hsm.core.Container):
         if self._status == ActionState.WAITING_FOR_SERVER:
             self._status = ActionState.PENDING
             if not self._action_wait_thread.is_alive():
-                self._action_wait_thread = threading.Thread(name=self._action_name + '/wait_for_server', target=self._wait_for_server)
+                self._action_wait_thread = threading.Thread(name=self._action_name + '/wait_for_server',
+                                                            target=self._wait_for_server)
                 self._action_wait_thread.start()
 
         elif self._status == ActionState.INACTIVE:

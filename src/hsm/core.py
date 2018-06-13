@@ -179,7 +179,7 @@ class State(object):
         """
         handlers = self._handlers.get(trigger, [])
         handlers.append(func)
-        if len(handlers) == 1:
+        if len(handlers) == 1:  # initially create dict entry
             self._handlers[trigger] = handlers
 
     def add_transition(self, events, target_state, condition=None, action=None, before=None, after=None):
