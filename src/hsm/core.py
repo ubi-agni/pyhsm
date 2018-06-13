@@ -169,7 +169,7 @@ class State(object):
             if trigger.startswith('on_') and callable(value):
                 self.add_handler(trigger[3:], value)
 
-    def add_handler(self, trigger, func):
+    def add_handler(self, events, func):
         """ Add a new event callback.
 
         :param trigger: name of triggering event
@@ -177,10 +177,11 @@ class State(object):
         :param func: callback function
         :type func: callable
         """
-        handlers = self._handlers.get(trigger, [])
-        handlers.append(func)
-        if len(handlers) == 1:  # initially create dict entry
-            self._handlers[trigger] = handlers
+        for event in listify(events):
+            handlers = self._handlers.get(event, [])
+            handlers.append(func)
+            if len(handlers) == 1:  # initially create dict entry
+                self._handlers[event] = handlers
 
     def add_transition(self, events, target_state, condition=None, action=None, before=None, after=None):
         """Add a transition from self to target_state

@@ -38,7 +38,8 @@ def _ros_subscribe(state, topic, msg_type, handler):
 
     # a string "handler" is interpreted as an event to be triggered
     if isinstance(handler, string_types):
-        handler = lambda data: state.root.dispatch(Event(handler, msg=data))
+        name = handler  # need to use another name!
+        handler = lambda data: state.root.dispatch(Event(name, msg=data))
 
     # actually register the event
     state._ros_events.append(_ROSEvent(topic, msg_type, handler))
