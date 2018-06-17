@@ -99,10 +99,10 @@ class TransitionsContainer(collections.defaultdict):
     def add(self, event, transition):
         self[event].append(transition)
 
-    def get(self, event, from_state):
+    def get(self, event):
         for key in [event.name, any_event]:
             for transition in self[key]:
-                if transition['condition'](from_state, event) is True:
+                if transition['condition'](self, event) is True:
                     return transition
         return None
 
@@ -303,10 +303,26 @@ class State(object):
         e = event.userdata['source_event'] if is_enter_exit_event else event
 
         handler = self._handlers.get(event.name, None)
+        transition = self._transitions.get(event)
+        if handler is not None and transition is not None:
+            raise Exception("Both, event handler and transition defined for event '{}' in state '{}'".format(event.name, self.name))
+
         if handler:
             if e is not None:
                 e.propagate = False
             _call(handler, e)
+        elif transition is not None:
+            sm = self.root
+            to_state = transition['to_state']
+            if isinstance(to_state, _History):
+                to_state = to_state.parent.history_state
+
+            transition['before'](self, event)
+            top_state = sm._exit_states(event, self, to_state)
+            transition['action'](self, event)
+            sm._enter_states(event, top_state, to_state)
+            transition['after'](self.parent.leaf_state, event)
+            e.propagate = False
 
         # Never propagate exit/enter events, even if propagate is set to True
         if not is_enter_exit_event and self.parent and e.propagate:
@@ -495,15 +511,6 @@ class StateMachine(Container):
         super(StateMachine, self).__init__(name)
         self._transition_cbs = []
 
-    def _get_transition(self, event, leaf_state):
-        state = leaf_state
-        while state is not None:
-            transition = state._transitions.get(event, state)
-            if transition is not None:
-                return transition
-            state = state.parent
-        return None
-
     def initialize(self):
         """Initialize states in the state machine.
 
@@ -557,25 +564,7 @@ class StateMachine(Container):
         if isinstance(event, string_types):
             event = Event(event)
         event._machine = self
-        leaf_state_before = self.leaf_state
-
-        # TODO: _on(event) handler and registered transitions should be mutually exclusive
-        leaf_state_before._on(event)
-
-        transition = self._get_transition(event, leaf_state_before)
-        if transition is None:
-            return
-        to_state = transition['to_state']
-        if isinstance(to_state, _History):
-            to_state = to_state.parent.history_state
-
-        transition['before'](leaf_state_before, event)
-        top_state = self._exit_states(event, leaf_state_before, to_state)
-        transition['action'](leaf_state_before, event)
-        self._enter_states(event, top_state, to_state)
-        leaf_state_after = self.leaf_state
-        transition['after'](leaf_state_after, event)
-        self.call_transition_cbs(leaf_state_before, leaf_state_after)
+        self.leaf_state._on(event)
 
     def _transition_to(self, to_state, event):
         """manual transition to given state"""
