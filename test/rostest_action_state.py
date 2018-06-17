@@ -3,7 +3,6 @@ from __future__ import print_function
 from hsm import StateMachine, any_event
 from hsm.action_state import ActionState
 import grasping_msgs.msg, geometry_msgs.msg, shape_msgs.msg
-import time
 import rospy
 import unittest
 import rostest
@@ -66,7 +65,7 @@ class ActionStateTest(unittest.TestCase):
         self.assertEquals(sm.leaf_state.name, "grasp_provider")
 
         # wait some time for a result
-        time.sleep(3)
+        rospy.sleep(3)
         self.assertEquals(sm.leaf_state.name, "done")
         self.assertTrue(sm.grasps > 0)
         self.assertEquals(sm.done_count, 1)
@@ -76,12 +75,12 @@ class ActionStateTest(unittest.TestCase):
         self.assertEquals(sm.leaf_state.name, "grasp_provider")
 
         # abort compute by triggering any event other than SUCCEEDED
-        time.sleep(0.5)
+        rospy.sleep(0.5)
         sm.dispatch("foo")
         self.assertEquals(sm.leaf_state.name, "done")
 
         # wait some more time for a result
-        time.sleep(3)
+        rospy.sleep(3)
         self.assertEquals(sm.grasps, 0)
         self.assertEquals(sm.done_count, 0)
 
@@ -90,7 +89,7 @@ class ActionStateTest(unittest.TestCase):
         self.assertEquals(sm.leaf_state.name, "grasp_provider")
 
         # abort compute by triggering any event other than SUCCEEDED
-        time.sleep(0.5)
+        rospy.sleep(0.5)
         sm.dispatch("foo")
         self.assertEquals(sm.leaf_state.name, "done")
         self.assertEquals(sm.grasps, 0)
@@ -101,7 +100,7 @@ class ActionStateTest(unittest.TestCase):
         self.assertEquals(sm.leaf_state.name, "grasp_provider")
 
         # wait some more time for a result
-        time.sleep(3)
+        rospy.sleep(3)
         self.assertTrue(sm.grasps > 0)
         self.assertEquals(sm.done_count, 1)
 
