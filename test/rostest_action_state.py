@@ -14,7 +14,7 @@ class GraspProvider(ActionState):
     def __init__(self):
         super(GraspProvider, self).__init__("grasp_provider", grasping_msgs.msg.GenerateGraspsAction)
 
-    def _on_enter(self, state, event):
+    def _on_enter(self, event):
         """fill and trigger a goal request"""
         self.goal.config_name = "shadow_left_handed_limited"
         o = self.goal.object
@@ -51,12 +51,12 @@ class Compute(StateMachine):
         self.register_transition_cb(self.on_transition)
         self.initialize()
 
-    def show_result(self, state, event):
+    def show_result(self, event):
         self.grasps = len(event.userdata['result'].grasps)
         self.done_count += 1
         log.debug("{} grasps found".format(len(event.userdata['result'].grasps)))
 
-    def on_transition(self, from_state, to_state):
+    def on_transition(self, to_state):
         log.debug("entered state: {}".format(to_state.name))
 
 

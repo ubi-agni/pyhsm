@@ -141,10 +141,10 @@ class State(object):
 
         # Extending State to encapsulate state-related behavior.
         class Running(State):
-            def on_enter(self, state, event):
+            def on_enter(self, event):
                 print('Running state entered')
 
-            def on_jump(self, state, event):
+            def on_jump(self, event):
                 print('Jumping')
 
     .. code-block:: python
@@ -306,10 +306,10 @@ class State(object):
         if handler:
             if e is not None:
                 e.propagate = False
-            _call(handler, self, e)
+            _call(handler, e)
 
         # Never propagate exit/enter events, even if propagate is set to True
-        if not is_enter_exit_event and self.parent and e.propagate :
+        if not is_enter_exit_event and self.parent and e.propagate:
             self.parent._on(event)
 
     def _nop(self, state, event):
@@ -746,12 +746,12 @@ class ProcessingState(State):
     def request_preempt(self):
         self.preempt_requested = True
 
-    def _on_enter(self, state, event):
+    def _on_enter(self, event):
         self.preempt_requested = False
         self._thread = ProcessorThread(self, event)
         self._thread.start()
 
-    def _on_exit(self, state, event):
+    def _on_exit(self, event):
         # indicate that the thread should cancel
         self._thread.interrupted = True
         self.request_preempt()

@@ -101,7 +101,7 @@ class ActionState(hsm.Container):
         self.root.dispatch('TIMEOUT')
 
 
-    def _on_enter(self, state, event):
+    def _on_enter(self, event):
         _LOGGER.debug("status: %d" % self._status)
         # If we immediately re-entered the state after exiting, status might be still EXITING
         if self._status == ActionState.EXITING:
@@ -123,7 +123,7 @@ class ActionState(hsm.Container):
         else:
             raise Exception('unexpected internal state %d' % self._status)
 
-    def _on_exit(self, state, event):
+    def _on_exit(self, event):
         if self._status == ActionState.ACTIVE:
             _LOGGER.debug("Cancel goal request on '{}'".format(self._action_name))
             self._action_client.cancel_goal()

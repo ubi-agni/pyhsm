@@ -32,9 +32,9 @@ def _ros_subscribe(state, topic, msg_type, handler):
         # define _ros_events attribute
         state._ros_events = []
         # on enter, subscribe to topics
-        state.add_handler('enter', _subscribe_ros_events)
+        state.add_handler('enter', lambda event: _subscribe_ros_events(state, event))
         # on exit, unsubscribe
-        state.add_handler('exit', _unsubscribe_ros_events)
+        state.add_handler('exit', lambda event: _unsubscribe_ros_events(state, event))
 
     # a string "handler" is interpreted as an event to be triggered
     if isinstance(handler, string_types):

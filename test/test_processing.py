@@ -32,7 +32,7 @@ class Compute(StateMachine):
         print("ready")
         return "done"
 
-    def count(self, state, event):
+    def count(self, event):
         self.done_count += 1
 
     def on_transition(self, from_state, to_state):

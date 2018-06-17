@@ -13,6 +13,8 @@ class HeatingState(Container):
         self.add_state(baking, initial=True)
         toasting = State('Toasting')
         self.add_state(toasting)
+        self.add_handler('enter', self.on_enter)
+        self.add_handler('exit', self.on_exit)
 
     def on_enter(self, event):
         oven = event.userdata['oven']
@@ -89,11 +91,11 @@ class Oven(object):
         self.sm.dispatch(Event('timeout', oven=self))
         self.timer = threading.Timer(Oven.TIMEOUT, self.on_timeout)
 
-    def on_open_enter(self, state, event):
+    def on_open_enter(self, event):
         print('Opening door')
         self.light_on()
 
-    def on_open_exit(self, state, event):
+    def on_open_exit(self, event):
         print('Closing door')
         self.light_off()
 

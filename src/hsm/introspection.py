@@ -337,5 +337,5 @@ class IntrospectionServer():
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
 
-    def _transition_handler(self, state, event):
+    def _transition_handler(self, event):
         self._machine._transition_to(event.userdata['to_state'], event=None)
