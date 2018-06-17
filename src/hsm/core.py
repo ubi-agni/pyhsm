@@ -165,6 +165,7 @@ class State(object):
         self._transitions = TransitionsContainer()
 
         # register handlers for methods with name "on_*"
+        return # TODO: this fails with class methods
         for trigger, value in iteritems(self.__class__.__dict__):
             if trigger.startswith('on_') and callable(value):
                 self.add_handler(trigger[3:], value)
@@ -625,6 +626,8 @@ class StateMachine(Container):
             enter_event = Event('enter', propagate=False, source_event=event)
             enter_event._machine = self
             state._on(enter_event)
+
+            # remember current state in parent
             if state.parent is not None:
                 state.parent.state = state
 
