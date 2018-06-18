@@ -170,7 +170,7 @@ class State(object):
             if trigger.startswith('on_') and callable(value):
                 self.add_handler(trigger[3:], value)
 
-    def add_handler(self, events, func):
+    def add_handler(self, events, func, prepend=False):
         """ Add a new event callback.
 
         :param trigger: name of triggering event
@@ -180,7 +180,10 @@ class State(object):
         """
         for event in listify(events):
             handlers = self._handlers.get(event, [])
-            handlers.append(func)
+            if prepend:
+                handlers.insert(0, func)
+            else:
+                handlers.append(func)
             if len(handlers) == 1:  # initially create dict entry
                 self._handlers[event] = handlers
 
