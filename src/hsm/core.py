@@ -165,10 +165,9 @@ class State(object):
         self._transitions = TransitionsContainer()
 
         # register handlers for methods with name "on_*"
-        return # TODO: this fails with class methods
         for trigger, value in iteritems(self.__class__.__dict__):
             if trigger.startswith('on_') and callable(value):
-                self.add_handler(trigger[3:], value)
+                self.add_handler(trigger[3:], getattr(self,trigger))
 
     def add_handler(self, events, func, prepend=False):
         """ Add a new event callback.
