@@ -22,6 +22,7 @@ def _subscribe_ros_events(state, event):
 def _unsubscribe_ros_events(state, event):
     # unsubscribe events
     for e in state._ros_events:
+        e.subscriber.unregister()
         del e.subscriber
         _LOGGER.debug("unsubscribed from " + e.topic)
 
