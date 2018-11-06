@@ -17,10 +17,9 @@ from __future__ import print_function
 from six import iteritems
 
 import collections
-from collections import deque
 from threading import Thread
 import Queue
-
+import signal
 import logging
 _LOGGER = logging.getLogger("hsm.core")
 
@@ -524,7 +523,7 @@ class StateMachine(Container):
         state machine in the hierarchy.
 
         """
-        states = deque()
+        states = collections.deque()
         states.append(self)
         validator = Validator(self)
         while states:
@@ -642,7 +641,7 @@ class Validator(object):
 
     def _validate_state_already_added(self, state):
         root_machine = self._machine.root
-        machines = deque()
+        machines = collections.deque()
         machines.append(root_machine)
         while machines:
             machine = machines.popleft()
@@ -767,19 +766,34 @@ def run(sm, final_state):
         final_state = sm[final_state]
 
     event_queue = Queue.Queue()
-    def dispatch_with_queue(event):
+    def _dispatch_with_queue(event):
         event_queue.put(event)
 
     sm._dispatch = sm.dispatch
-    sm.dispatch = dispatch_with_queue
+    sm.dispatch = _dispatch_with_queue
 
     sm.initialize()
-    def finished():
+    def _finished():
         return sm.leaf_state is final_state or sm.leaf_state.is_substate(final_state)
 
-    while not finished():
-        event = event_queue.get()
-        sm._dispatch(event)
+    def _signal_handler(signum, frame):
+        print(' Finishing on signal')
+        sm._transition_to(final_state, event=None)
 
+    # install signal handler
+    old_int_handler = signal.signal(signal.SIGINT, _signal_handler)
+    old_term_handler = signal.signal(signal.SIGTERM, _signal_handler)
+
+    while not _finished():
+        try:
+            event = event_queue.get(False, 0.1)
+            sm._dispatch(event)
+        except Queue.Empty:
+            pass
+
+    # restore signal handler
+    signal.signal(signal.SIGINT, old_int_handler)
+    signal.signal(signal.SIGTERM, old_term_handler)
+    # restore dispatch()
     sm.dispatch = sm._dispatch
     del(sm._dispatch)
