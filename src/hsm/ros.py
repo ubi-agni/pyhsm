@@ -15,7 +15,7 @@ class _ROSEvent(object):
 def _subscribe_ros_events(state, event):
     # subscribe events
     for e in state._ros_events:
-        _LOGGER.debug("subscribing to %", e.topic)
+        _LOGGER.debug("subscribing to " + e.topic)
         e.subscriber = rospy.Subscriber(e.topic, e.msg_type, e.handler)
 
 
@@ -23,7 +23,7 @@ def _unsubscribe_ros_events(state, event):
     # unsubscribe events
     for e in state._ros_events:
         del e.subscriber
-        _LOGGER.debug("unsubscribed from %", e.topic)
+        _LOGGER.debug("unsubscribed from " + e.topic)
 
 
 def _ros_subscribe(state, topic, msg_type, handler):
