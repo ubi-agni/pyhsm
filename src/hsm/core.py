@@ -47,6 +47,15 @@ def _call(handler, *args, **kwargs):
         cb(*args, **kwargs)
 
 
+def bind(instance, function):
+    """ Turn a function to a bound method on an instance
+    :param instance: some object
+    :param function: unbound method, i.e. a function that takes `self` argument
+                     that you now want to be bound to this class as a method
+    """
+    return function.__get__(instance, instance.__class__)
+
+
 class StateMachineException(Exception):
     """All |StateMachine| exceptions are of this type."""
     pass
