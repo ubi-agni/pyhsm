@@ -191,7 +191,7 @@ class ContainerProxy():
 
         for k,transitions in self._container._transitions.items():
             for t in transitions:
-                internal_outcomes.append(k[1])
+                internal_outcomes.append(str(k))
                 outcomes_from.append(self._container.name)
                 outcomes_to.append(t['to_state'].name)
         container_outcomes = set()#self._container.get_registered_outcomes()
@@ -275,8 +275,6 @@ class IntrospectionServer():
         proxy = self.construct(self._server_name, self._machine, self._path)
         # get informed about transitions
         self._machine.register_transition_cb(self._transition_cb, proxy)
-        # handle __TRANSITION__ events
-        self._machine.add_handler('__TRANSITION__', self._transition_handler)
 
         self._transition_cmd = rospy.Subscriber(
             self._server_name + TRANSITION_TOPIC,
@@ -336,6 +334,3 @@ class IntrospectionServer():
 
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
-
-    def _transition_handler(self, event):
-        self._machine._transition_to(event.userdata['to_state'], event=None)

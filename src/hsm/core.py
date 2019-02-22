@@ -313,7 +313,7 @@ class State(object):
         e = event.userdata['source_event'] if is_enter_exit_event else event
 
         handler = self._handlers.get(event.name, None)
-        transition = self._transitions.get(event)
+        transition = None if is_enter_exit_event else self._transitions.get(event)
         if handler is not None and transition is not None:
             raise Exception("Both, event handler and transition defined for event '{}' in state '{}'".format(event.name, self.name))
 
@@ -331,7 +331,9 @@ class State(object):
             top_state = sm._exit_states(event, self, to_state)
             transition['action'](self, event)
             sm._enter_states(event, top_state, to_state)
-            transition['after'](self.parent.leaf_state, event)
+            # Why is self.parent.leaf_state passed here?
+            # transition['after'](self.parent.leaf_state, event)
+            transition['after'](to_state, event)
             e.propagate = False
 
         # Never propagate exit/enter events, even if propagate is set to True
@@ -573,8 +575,11 @@ class StateMachine(Container):
         """
         if isinstance(event, string_types):
             event = Event(event)
-        event._machine = self
-        self.leaf_state._on(event)
+        if event.name == '__TRANSITION__':
+            self._transition_to(event.userdata['to_state'], event=None)
+        else:
+            event._machine = self
+            self.leaf_state._on(event)
 
     def _transition_to(self, to_state, event):
         """manual transition to given state"""
