@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import hsm
 import rospy
 import threading
@@ -50,7 +52,7 @@ class ActionState(hsm.Container):
             self._action_client = client
         else:
             self._action_client = actionlib.SimpleActionClient(action_name, action_spec)
-        self._action_name = self._action_client .action_client.ns
+        self._action_name = self._action_client.action_client.ns
 
         # Initialize base class
         super(ActionState, self).__init__(name if name is not None else self._action_name)
@@ -80,9 +82,9 @@ class ActionState(hsm.Container):
                     self._on_server_ready()
                     return
             except:
-                print("Unexpected error:", sys.exc_info()[0])
-                if not rospy.core._in_shutdown: # wait_for_server should not throw an exception just because shutdown was called
-                    break
+                if rospy.core._in_shutdown: # silently return if just a shutdown was triggered
+                    return
+                raise
         _LOGGER.warning("Action server '{0}' not found for {1:.1f} seconds."
                         .format(self._action_name, (rospy.get_rostime() - timeout_time + self._server_wait_timeout).to_sec()))
         self._on_server_failed()
