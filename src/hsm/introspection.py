@@ -21,6 +21,7 @@ STRUCTURE_TOPIC = '/smach/container_structure'
 TRANSITION_TOPIC = '/smach/transition'
 EVENT_TOPIC = '/smach/event'
 
+
 # class IntrospectionClient():
 #     def get_servers(self):
 #         """Get the base names that are broadcasting smach states."""
@@ -39,8 +40,8 @@ EVENT_TOPIC = '/smach/event'
 #         """Set the initial state of a smach server.
 #
 #         @type server: string
-#         @param server: The name of the introspection server to which this client
-#         should connect.
+#         @param server: The name of the introspection server to which this
+#         client should connect.
 #
 #         @type path: string
 #         @param path: The path to the target container in the state machine.
@@ -50,12 +51,13 @@ EVENT_TOPIC = '/smach/event'
 #         starts. This is as list of at least one state label.
 #
 #         @type initial_userdata: UserData
-#         @param initial_userdata: The userdata to inject into the target container.
+#         @param initial_userdata: The userdata to inject into the target
+#         container.
 #
 #         @type timeout: rospy.Duration
-#         @param timeout: Timeout for this call. If this is set to None, it will not
-#         block, and the initial state may not be set before the target state machine
-#         goes active.
+#         @param timeout: Timeout for this call. If this is set to None, it will
+#         not block, and the initial state may not be set before the target state
+#         machine goes active.
 #         """
 #
 #         # Construct initial state command
@@ -64,7 +66,8 @@ EVENT_TOPIC = '/smach/event'
 #             initial_states=initial_states,
 #             local_data=pickle.dumps(initial_userdata._data, 2))
 #
-#         # A status message to receive confirmation that the state was set properly
+#         # A status message to receive confirmation that the state was
+#         # set properly
 #         msg_response = SmachContainerStatus()
 #
 #         # Define a local callback to just stuff a local message
@@ -75,14 +78,18 @@ EVENT_TOPIC = '/smach/event'
 #             msg_response.local_data = msg.local_data
 #
 #         # Create a subscriber to verify the request went through
-#         state_sub = rospy.Subscriber(server + STATUS_TOPIC, SmachContainerStatus,
-#                                      callback=local_cb, callback_args=msg_response)
+#         state_sub = rospy.Subscriber(server + STATUS_TOPIC,
+#                                      SmachContainerStatus,
+#                                      callback=local_cb,
+#                                      callback_args=msg_response)
 #
 #         # Create a publisher to send the command
-#         rospy.logdebug("Sending initial state command: " + str(
-#             initial_status_msg.path) + " on topic '" + server + INIT_TOPIC + "'")
+#         rospy.logdebug("Sending initial state command: "
+#                        + str(initial_status_msg.path) + " on topic '"
+#                        + server + INIT_TOPIC + "'")
 #         init_pub = rospy.Publisher(server + INIT_TOPIC,
-#                                    SmachContainerInitialStatusCmd, queue_size=1)
+#                                    SmachContainerInitialStatusCmd,
+#                                    queue_size=1)
 #         init_pub.publish(initial_status_msg)
 #
 #         start_time = rospy.Time.now()
@@ -96,14 +103,17 @@ EVENT_TOPIC = '/smach/event'
 #                 # Filter messages that are from other containers
 #                 if msg_response.path == path:
 #                     # Check if the heartbeat came back to match
-#                     state_match = all([s in msg_response.initial_states for s in initial_states])
+#                     state_match = all([s in msg_response.initial_states
+#                                        for s in initial_states])
 #                     local_data = smach.UserData()
 #                     local_data._data = pickle.loads(msg_response.local_data)
-#                     ud_match = all([ \
-#                         (key in local_data and local_data._data[key] == initial_userdata._data[key]) \
-#                         for key in initial_userdata._data])
+#                     ud_match = all([(key in local_data
+#                                      and local_data._data[key]
+#                                      == initial_userdata._data[key])
+#                                     for key in initial_userdata._data])
 #
-#                     rospy.logdebug("STATE MATCH: " + str(state_match) + ", UD_MATCH: " + str(ud_match))
+#                     rospy.logdebug("STATE MATCH: " + str(state_match)
+#                                    + ", UD_MATCH: " + str(ud_match))
 #
 #                     if state_match and ud_match:
 #                         return True
