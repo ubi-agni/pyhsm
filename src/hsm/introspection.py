@@ -1,14 +1,17 @@
-import rospy
-from std_msgs.msg import Header, String
-
 import pickle
 import threading
-import hsm
+
+import rospy
 import smach
+from smach_msgs.msg import SmachContainerStatus, \
+    SmachContainerInitialStatusCmd, SmachContainerStructure
+from std_msgs.msg import Header, String
+import pyhsm_msgs.msg as msgs
 
-from smach_msgs.msg import SmachContainerStatus, SmachContainerInitialStatusCmd, SmachContainerStructure
+import hsm
+from hsm.core import Container
 
-#__all__ = ['IntrospectionClient', 'IntrospectionServer']
+# __all__ = ['IntrospectionClient', 'IntrospectionServer']
 __all__ = ['IntrospectionServer']
 
 # Topic names
@@ -17,8 +20,6 @@ INIT_TOPIC = '/smach/container_init'
 STRUCTURE_TOPIC = '/smach/container_structure'
 TRANSITION_TOPIC = '/smach/transition'
 EVENT_TOPIC = '/smach/event'
-
-from hsm.core import Container
 
 # class IntrospectionClient():
 #     def get_servers(self):
@@ -116,9 +117,9 @@ class ContainerProxy():
     This class is used as a container for introspection and debugging.
     """
 
-    def __init__(self, server_name, container, path, update_rate=rospy.Duration(2.0)):
-        """Constructor for tree-wide data structure.
-        """
+    def __init__(self, server_name, container, path,
+                 update_rate=rospy.Duration(2.0)):
+        """Constructor for tree-wide data structure."""
         self._path = path
         self._container = container
         self._update_rate = update_rate
@@ -143,10 +144,13 @@ class ContainerProxy():
             queue_size=1)
 
         # Create thread to constantly publish
-        self._status_pub_thread = threading.Thread(name=server_name + ':status_publisher', target=self._status_pub_loop)
+        self._status_pub_thread = threading.Thread(
+            name=server_name + ':status_publisher',
+            target=self._status_pub_loop)
 
-        self._structure_pub_thread = threading.Thread(name=server_name + ':structure_publisher',
-                                                      target=self._structure_pub_loop)
+        self._structure_pub_thread = threading.Thread(
+            name=server_name + ':structure_publisher',
+            target=self._structure_pub_loop)
 
         self._keep_running = False
 
@@ -183,18 +187,19 @@ class ContainerProxy():
 
     def _publish_structure(self, info_str=''):
         path = self._path
-        children = [s.name for s in self._container.states]#list(self._container.get_children().keys())
+        children = [s.name for s in self._container.states]
+        # (at end of above) list(self._container.get_children().keys())
 
         internal_outcomes = []
         outcomes_from = []
         outcomes_to = []
 
-        for k,transitions in self._container._transitions.items():
+        for k, transitions in self._container._transitions.items():
             for t in transitions:
                 internal_outcomes.append(str(k))
                 outcomes_from.append(self._container.name)
                 outcomes_to.append(t['to_state'].name)
-        container_outcomes = set()#self._container.get_registered_outcomes()
+        container_outcomes = set()  # self._container.get_registered_outcomes()
 
         # Construct structure message
         structure_msg = SmachContainerStructure(
@@ -209,7 +214,8 @@ class ContainerProxy():
             self._structure_pub.publish(structure_msg)
         except:
             if not rospy.is_shutdown():
-                rospy.logerr("Publishing SMACH introspection structure message failed.")
+                rospy.logerr(
+                    "Publishing SMACH introspection structure message failed.")
 
     def _publish_status(self, info_str=""):
         """Publish current state of this container."""
@@ -234,13 +240,16 @@ class ContainerProxy():
         local_data = msg.local_data
 
         # Check if this init message is directed at this path
-        rospy.logdebug('Received init message for path: ' + msg.path + ' to ' + str(initial_states))
+        rospy.logdebug('Received init message for path: ' + msg.path
+                       + ' to ' + str(initial_states))
         if msg.path == self._path:
-            if all(s in self._container.get_children() for s in initial_states):
+            if all(s in self._container.get_children()
+                   for s in initial_states):
                 ud = smach.UserData()
                 ud._data = pickle.loads(msg.local_data)
-                rospy.logdebug("Setting initial state in smach path: '" + self._path + "' to '" + str(
-                    initial_states) + "' with userdata: " + str(ud._data))
+                rospy.logdebug("Setting initial state in smach path: '"
+                               + self._path + "' to '" + str(initial_states)
+                               + "' with userdata: " + str(ud._data))
 
                 # Set the initial state
                 self._container.set_initial_state(
@@ -249,16 +258,20 @@ class ContainerProxy():
                 # Publish initial state
                 self._publish_status("REMOTE_INIT")
             else:
-                rospy.logerr("Attempting to set initial state in container '" + self._path + "' to '") #+ str(
-                   # initial_states) + "', but this container only has states: " + str(self._container.get_children()))
+                rospy.logerr("Attempting to set initial state in container '"
+                             + self._path + "' to '")
+                # + str(initial_states)
+                # + "', but this container only has states: "
+                # + str(self._container.get_children()))
 
 
 class IntrospectionServer():
     """Server for providing introspection and control for smach."""
 
     def __init__(self, server_name, machine, path):
-        """Traverse the smach tree starting at root, and construct introspection
-        proxies for getting and setting debug state."""
+        """Traverse the smach tree starting at root, and construct
+        introspection proxies for getting and setting debug state.
+        """
 
         # A list of introspection proxies
         self._proxies = []
@@ -267,8 +280,6 @@ class IntrospectionServer():
         self._server_name = server_name
         self._machine = machine
         self._path = path
-
-
 
     def start(self):
         # Construct proxies
@@ -302,7 +313,6 @@ class IntrospectionServer():
             if isinstance(child, Container):
                 self.construct(server_name, child, path + '/' + child.name)
 
-
         # Publish initial state
         proxy._publish_status('Initial state')
 
@@ -326,10 +336,11 @@ class IntrospectionServer():
             for k in msg.data.split('/')[1:]:
                 to_state = to_state[k]
         except:
-            rospy.logerr('Unknown state %s' % msg.data)
+            rospy.logerr('Unknown state {}'.format(msg.data))
             return
 
-        # dispatch an event to trigger the transition (don't call _transition_to() directly!)
+        # dispatch an event to trigger the transition
+        # (don't call _transition_to() directly!)
         self._machine.dispatch(hsm.Event('__TRANSITION__', to_state=to_state))
 
     def _event_trigger_cb(self, msg):
