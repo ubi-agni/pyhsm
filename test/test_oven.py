@@ -101,7 +101,7 @@ if __name__ == '__main__':
     logger.addHandler(logging.StreamHandler())
 
     oven = Oven()
-    sis = IntrospectionServer('hsm_introspection', oven, 'oven')
+    sis = IntrospectionServer('hsm_introspection', oven, '')
     sis.start()
     raw_input("Press a key to quit")
     sis.stop()
