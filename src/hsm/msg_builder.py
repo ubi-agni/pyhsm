@@ -14,6 +14,10 @@ STATUS_MSG = msgs.HsmStatus
 STRUCTURE_MSG = msgs.HsmStructure
 
 
+def build_status_msg(path):
+    return msgs.HsmStatus(path)
+
+
 def build_structure_msg(prefix, machine):
     """Return a structure message with the given prefix for the
     given state machine.

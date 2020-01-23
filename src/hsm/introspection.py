@@ -3,9 +3,8 @@ import threading
 
 import rospy
 import smach
-from smach_msgs.msg import SmachContainerStatus, \
-    SmachContainerInitialStatusCmd
-from std_msgs.msg import Header, String
+from smach_msgs.msg import SmachContainerInitialStatusCmd
+from std_msgs.msg import String
 
 import hsm
 from hsm.core import Container
@@ -145,7 +144,7 @@ class ContainerProxy():
         # Advertise status publisher
         self._status_pub = rospy.Publisher(
             name=server_name + STATUS_TOPIC,
-            data_class=SmachContainerStatus,
+            data_class=msg_builder.STATUS_MSG,
             queue_size=1)
 
         # Create thread to constantly publish
@@ -181,13 +180,7 @@ class ContainerProxy():
             path = self._path
 
             # Construct status message
-            state_msg = SmachContainerStatus(
-                Header(stamp=rospy.Time.now()),
-                path,
-                [state.name for state in self._container.get_initial_states()],
-                [state.name for state in self._container.get_active_states()],
-                pickle.dumps(smach.UserData()._data, 2),
-                info_str)
+            state_msg = msg_builder.build_status_msg(path)
             # Publish message
             self._status_pub.publish(state_msg)
 
