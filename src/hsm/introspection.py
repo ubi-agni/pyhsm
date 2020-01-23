@@ -4,12 +4,13 @@ import threading
 import rospy
 import smach
 from smach_msgs.msg import SmachContainerStatus, \
-    SmachContainerInitialStatusCmd, SmachContainerStructure
+    SmachContainerInitialStatusCmd
 from std_msgs.msg import Header, String
 import pyhsm_msgs.msg as msgs
 
 import hsm
 from hsm.core import Container
+from hsm import msg_builder
 
 # __all__ = ['IntrospectionClient', 'IntrospectionServer']
 __all__ = ['IntrospectionServer']
@@ -136,16 +137,11 @@ class ContainerProxy():
         self._status_pub_lock = threading.Lock()
 
         # Advertise init service
+        # TODO most likely not necessary anymore
         self._init_cmd = rospy.Subscriber(
             server_name + INIT_TOPIC,
             SmachContainerInitialStatusCmd,
             self._init_cmd_cb)
-
-        # Advertise structure publisher
-        self._structure_pub = rospy.Publisher(
-            name=server_name + STRUCTURE_TOPIC,
-            data_class=SmachContainerStructure,
-            queue_size=1)
 
         # Advertise status publisher
         self._status_pub = rospy.Publisher(
@@ -158,22 +154,17 @@ class ContainerProxy():
             name=server_name + ':status_publisher',
             target=self._status_pub_loop)
 
-        self._structure_pub_thread = threading.Thread(
-            name=server_name + ':structure_publisher',
-            target=self._structure_pub_loop)
-
         self._keep_running = False
 
     def start(self):
         self._keep_running = True
         self._status_pub_thread.start()
-        self._structure_pub_thread.start()
 
     def stop(self):
         self._keep_running = False
 
     def _status_pub_loop(self):
-        """Loop to publish the status and structure heartbeats."""
+        """Loop to publish the status heartbeat."""
         while not rospy.is_shutdown() and self._keep_running:
             # TODO
             self._publish_status('HEARTBEAT')
@@ -183,49 +174,6 @@ class ContainerProxy():
                     rospy.sleep(0.1)
             except:
                 pass
-
-    def _structure_pub_loop(self):
-        """Loop to publish the status and structure heartbeats."""
-        while not rospy.is_shutdown() and self._keep_running:
-            self._publish_structure('HEARTBEAT')
-            try:
-                end_time = rospy.Time.now() + self._update_rate
-                while not rospy.is_shutdown() and rospy.Time.now() < end_time:
-                    rospy.sleep(0.1)
-            except:
-                pass
-
-    def _publish_structure(self, info_str=''):
-        path = self._path
-        children = [s.name for s in self._container.states]
-        # (at end of above) list(self._container.get_children().keys())
-
-        internal_outcomes = []
-        outcomes_from = []
-        outcomes_to = []
-
-        for k, transitions in self._container._transitions.items():
-            for t in transitions:
-                internal_outcomes.append(str(k))
-                outcomes_from.append(self._container.name)
-                outcomes_to.append(t['to_state'].name)
-        container_outcomes = set()  # self._container.get_registered_outcomes()
-
-        # Construct structure message
-        structure_msg = SmachContainerStructure(
-            Header(stamp=rospy.Time.now()),
-            path,
-            children,
-            internal_outcomes,
-            outcomes_from,
-            outcomes_to,
-            container_outcomes)
-        try:
-            self._structure_pub.publish(structure_msg)
-        except:
-            if not rospy.is_shutdown():
-                rospy.logerr(
-                    "Publishing SMACH introspection structure message failed.")
 
     def _publish_status(self, info_str=""):
         """Publish current state of this container."""
@@ -291,11 +239,28 @@ class IntrospectionServer():
         self._machine = machine
         self._path = path
 
+        # Advertise structure publisher
+        self._structure_pub = rospy.Publisher(
+            name=server_name + STRUCTURE_TOPIC,
+            data_class=msgs.HsmStructure,
+            queue_size=1,
+            latch=True)
+
+        # TODO While the function is not reworked, we can comment this out.
+        # self._structure_pub_thread = threading.Thread(
+        #     name=server_name + ':structure_publisher',
+        #     target=self._structure_pub_loop)
+
     def start(self):
         # Construct proxies
         proxy = self.construct(self._server_name, self._machine, self._path)
         # get informed about transitions
         self._machine.register_transition_cb(self._transition_cb, proxy)
+
+        # TODO after rework, uncomment and
+        #      maybe remove `_publish_structure` line
+        # self._structure_pub_thread.start()
+        self._publish_structure('INITIAL')
 
         self._transition_cmd = rospy.Subscriber(
             self._server_name + TRANSITION_TOPIC,
@@ -355,3 +320,27 @@ class IntrospectionServer():
 
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
+
+    # TODO Rework this function so it only publishes if the HSM
+    # structure has changed.
+    def _structure_pub_loop(self):
+        """Loop to publish the status and structure heartbeats."""
+        while not rospy.is_shutdown() and self._keep_running:
+            self._publish_structure('CHANGE')
+            try:
+                end_time = rospy.Time.now() + self._update_rate
+                while not rospy.is_shutdown() and rospy.Time.now() < end_time:
+                    rospy.sleep(0.1)
+            except:
+                pass
+
+    def _publish_structure(self, info_str=''):
+        path = self._path
+
+        structure_msg = msg_builder.build_structure_msg(path, self._machine)
+        try:
+            self._structure_pub.publish(structure_msg)
+        except:
+            if not rospy.is_shutdown():
+                rospy.logerr(
+                    "Publishing SMACH introspection structure message failed.")
