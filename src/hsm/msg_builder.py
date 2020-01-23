@@ -10,8 +10,13 @@ from hsm.core import _History
 
 # Magic word for transitions to previous state
 HISTORY_TRANSITION_MAGIC_WORD = '__HISTORY'
+
+# Types for the public API
 STATUS_MSG = msgs.HsmStatus
 STRUCTURE_MSG = msgs.HsmStructure
+
+# What type to filter ROS topics by to get these messages
+STATUS_MSG_TOPIC_TYPE = 'pyhsm_msgs/HsmStatus'
 
 
 def build_status_msg(path):
@@ -32,6 +37,9 @@ def build_structure_msg(prefix, machine):
 def _build_state_msgs(machine):
     """Walk through the given state machine and build messages from
     all states.
+
+    This method is expected to iterate in pre-order so the tree can later be
+    created by reversing the returned list.
     """
     parent_hierarchy = []
     node_stack = [machine]

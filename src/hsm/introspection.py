@@ -2,6 +2,7 @@ import pickle
 import threading
 
 import rospy
+import rostopic
 import smach
 from smach_msgs.msg import SmachContainerInitialStatusCmd
 from std_msgs.msg import String
@@ -10,8 +11,7 @@ import hsm
 from hsm.core import Container
 from hsm import msg_builder
 
-# __all__ = ['IntrospectionClient', 'IntrospectionServer']
-__all__ = ['IntrospectionServer']
+__all__ = ['IntrospectionClient', 'IntrospectionServer']
 
 # Topic names
 STATUS_TOPIC = '/smach/container_status'
@@ -21,103 +21,91 @@ TRANSITION_TOPIC = '/smach/transition'
 EVENT_TOPIC = '/smach/event'
 
 
-# class IntrospectionClient():
-#     def get_servers(self):
-#         """Get the base names that are broadcasting smach states."""
-#
-#         # Get the currently broadcasted smach introspection topics
-#         topics = rostopic.find_by_type('smach_msgs/SmachContainerStatus')
-#
-#         return [t[:t.rfind(STATUS_TOPIC)] for t in topics]
-#
-#     def set_initial_state(self,
-#                           server,
-#                           path,
-#                           initial_states,
-#                           initial_userdata=smach.UserData(),
-#                           timeout=None):
-#         """Set the initial state of a smach server.
-#
-#         @type server: string
-#         @param server: The name of the introspection server to which this
-#         client should connect.
-#
-#         @type path: string
-#         @param path: The path to the target container in the state machine.
-#
-#         @type initial_states: list of string
-#         @param inital_state: The state the target container should take when it
-#         starts. This is as list of at least one state label.
-#
-#         @type initial_userdata: UserData
-#         @param initial_userdata: The userdata to inject into the target
-#         container.
-#
-#         @type timeout: rospy.Duration
-#         @param timeout: Timeout for this call. If this is set to None, it will
-#         not block, and the initial state may not be set before the target state
-#         machine goes active.
-#         """
-#
-#         # Construct initial state command
-#         initial_status_msg = SmachContainerInitialStatusCmd(
-#             path=path,
-#             initial_states=initial_states,
-#             local_data=pickle.dumps(initial_userdata._data, 2))
-#
-#         # A status message to receive confirmation that the state was
-#         # set properly
-#         msg_response = SmachContainerStatus()
-#
-#         # Define a local callback to just stuff a local message
-#         def local_cb(msg, msg_response):
-#             rospy.logdebug("Received status response: " + str(msg))
-#             msg_response.path = msg.path
-#             msg_response.initial_states = msg.initial_states
-#             msg_response.local_data = msg.local_data
-#
-#         # Create a subscriber to verify the request went through
-#         state_sub = rospy.Subscriber(server + STATUS_TOPIC,
-#                                      SmachContainerStatus,
-#                                      callback=local_cb,
-#                                      callback_args=msg_response)
-#
-#         # Create a publisher to send the command
-#         rospy.logdebug("Sending initial state command: "
-#                        + str(initial_status_msg.path) + " on topic '"
-#                        + server + INIT_TOPIC + "'")
-#         init_pub = rospy.Publisher(server + INIT_TOPIC,
-#                                    SmachContainerInitialStatusCmd,
-#                                    queue_size=1)
-#         init_pub.publish(initial_status_msg)
-#
-#         start_time = rospy.Time.now()
-#
-#         # Block until we get a new state back
-#         if timeout is not None:
-#             while rospy.Time.now() - start_time < timeout:
-#                 # Send the initial state command
-#                 init_pub.publish(initial_status_msg)
-#
-#                 # Filter messages that are from other containers
-#                 if msg_response.path == path:
-#                     # Check if the heartbeat came back to match
-#                     state_match = all([s in msg_response.initial_states
-#                                        for s in initial_states])
-#                     local_data = smach.UserData()
-#                     local_data._data = pickle.loads(msg_response.local_data)
-#                     ud_match = all([(key in local_data
-#                                      and local_data._data[key]
-#                                      == initial_userdata._data[key])
-#                                     for key in initial_userdata._data])
-#
-#                     rospy.logdebug("STATE MATCH: " + str(state_match)
-#                                    + ", UD_MATCH: " + str(ud_match))
-#
-#                     if state_match and ud_match:
-#                         return True
-#                 rospy.sleep(0.3)
-#             return False
+class IntrospectionClient():
+    def get_servers(self):
+        """Get the base names that are broadcasting smach states."""
+
+        # Get the currently broadcasted smach introspection topics
+        topics = rostopic.find_by_type(msg_builder.STATUS_MSG_TOPIC_TYPE)
+
+        return [t[:t.rfind(STATUS_TOPIC)] for t in topics]
+
+    def set_initial_state(self,
+                          server,
+                          path,
+                          initial_states,
+                          timeout=None):
+        """Set the initial state of a smach server.
+
+        @type server: string
+        @param server: The name of the introspection server to which this
+        client should connect.
+
+        @type path: string
+        @param path: The path to the target container in the state machine.
+
+        @type initial_states: list of string
+        @param inital_state: The state the target container should take when it
+        starts. This is as list of at least one state label.
+
+        @type timeout: rospy.Duration
+        @param timeout: Timeout for this call. If this is set to None, it will
+        not block, and the initial state may not be set before the target state
+        machine goes active.
+        """
+
+        # Construct initial state command
+        initial_status_msg = SmachContainerInitialStatusCmd(
+            path=path,
+            initial_states=initial_states,
+            local_data=pickle.dumps(smach.UserData(), 2))
+
+        # A status message to receive confirmation that the state was
+        # set properly
+        msg_response = msg_builder.STATUS_MSG()
+
+        # Define a local callback to just stuff a local message
+        def local_cb(msg, msg_response):
+            rospy.logdebug("Received status response: " + str(msg))
+            msg_response.path = msg.path
+
+        # Create a subscriber to verify the request went through
+        state_sub = rospy.Subscriber(server + STATUS_TOPIC,
+                                     msg_builder.STATUS_MSG,
+                                     callback=local_cb,
+                                     callback_args=msg_response)
+
+        # Create a publisher to send the command
+        rospy.logdebug("Sending initial state command: "
+                       + str(initial_status_msg.path) + " on topic '"
+                       + server + INIT_TOPIC + "'")
+        init_pub = rospy.Publisher(server + INIT_TOPIC,
+                                   SmachContainerInitialStatusCmd,
+                                   queue_size=1)
+        init_pub.publish(initial_status_msg)
+
+        start_time = rospy.Time.now()
+
+        # Block until we get a new state back
+        if timeout is not None:
+            while rospy.Time.now() - start_time < timeout:
+                # Send the initial state command
+                init_pub.publish(initial_status_msg)
+
+                # Filter messages that are from other containers
+                if msg_response.path == path:
+                    # Check if the heartbeat came back to match
+                    # FIXME TODO
+                    # state_match = all([s in msg_response.initial_states
+                    #                    for s in initial_states])
+                    state_match = True
+
+                    rospy.logdebug("STATE MATCH: " + str(state_match))
+
+                    if state_match:
+                        return True
+                rospy.sleep(0.3)
+            return False
 
 
 class ContainerProxy():
@@ -131,32 +119,21 @@ class ContainerProxy():
         """Constructor for tree-wide data structure."""
         self._path = path
         self._container = container
-        self._update_rate = update_rate
-        self._status_pub_lock = threading.Lock()
+        # self._update_rate = update_rate
+        # self._status_pub_lock = threading.Lock()
 
         # Advertise init service
         # TODO most likely not necessary anymore
-        self._init_cmd = rospy.Subscriber(
-            server_name + INIT_TOPIC,
-            SmachContainerInitialStatusCmd,
-            self._init_cmd_cb)
-
-        # Advertise status publisher
-        self._status_pub = rospy.Publisher(
-            name=server_name + STATUS_TOPIC,
-            data_class=msg_builder.STATUS_MSG,
-            queue_size=1)
-
-        # Create thread to constantly publish
-        self._status_pub_thread = threading.Thread(
-            name=server_name + ':status_publisher',
-            target=self._status_pub_loop)
+        # self._init_cmd = rospy.Subscriber(
+        #     server_name + INIT_TOPIC,
+        #     SmachContainerInitialStatusCmd,
+        #     self._init_cmd_cb)
 
         self._keep_running = False
 
     def start(self):
         self._keep_running = True
-        self._status_pub_thread.start()
+        # self._status_pub_thread.start()
 
     def stop(self):
         self._keep_running = False
@@ -218,7 +195,8 @@ class ContainerProxy():
 class IntrospectionServer():
     """Server for providing introspection and control for smach."""
 
-    def __init__(self, server_name, machine, path):
+    def __init__(self, server_name, machine, path,
+                 update_rate=rospy.Duration(2.0)):
         """Traverse the smach tree starting at root, and construct
         introspection proxies for getting and setting debug state.
         """
@@ -230,6 +208,10 @@ class IntrospectionServer():
         self._server_name = server_name
         self._machine = machine
         self._path = path
+        self._active_path = ''
+
+        self._status_pub_lock = threading.Lock()
+        self._update_rate = update_rate
 
         # Advertise structure publisher
         self._structure_pub = rospy.Publisher(
@@ -238,21 +220,36 @@ class IntrospectionServer():
             queue_size=1,
             latch=True)
 
+        self._status_pub = rospy.Publisher(
+            name=server_name + STATUS_TOPIC,
+            data_class=msg_builder.STATUS_MSG,
+            queue_size=1)
+
         # TODO While the function is not reworked, we can comment this out.
         # self._structure_pub_thread = threading.Thread(
         #     name=server_name + ':structure_publisher',
         #     target=self._structure_pub_loop)
 
+        # Create thread to constantly publish
+        self._status_pub_thread = threading.Thread(
+            name=server_name + ':status_publisher',
+            target=self._status_pub_loop)
+
+        self._keep_running = False
+
     def start(self):
         # Construct proxies
         proxy = self.construct(self._server_name, self._machine, self._path)
         # get informed about transitions
-        self._machine.register_transition_cb(self._transition_cb, proxy)
+        self._machine.register_transition_cb(self._transition_cb)
+
+        self._keep_running = True
 
         # TODO after rework, uncomment and
         #      maybe remove `_publish_structure` line
         # self._structure_pub_thread.start()
         self._publish_structure('INITIAL')
+        self._status_pub_thread.start()
 
         self._transition_cmd = rospy.Subscriber(
             self._server_name + TRANSITION_TOPIC,
@@ -262,29 +259,36 @@ class IntrospectionServer():
             String, self._event_trigger_cb)
 
     def stop(self):
+        self._keep_running = False
         for proxy in self._proxies:
             proxy.stop()
 
     def construct(self, server_name, state, path):
         """Recursively construct proxies to containers."""
+        if path == '/':
+            path = ''
+        elif path and path[-1] != '/':
+            path = path + '/'
+
+        path = path + state.name
+
         # Construct a new proxy
         proxy = ContainerProxy(server_name, state, path)
 
-        if path == '/':
-            path = ''
+        # Update active state
+        if state.is_active():
+            self._active_path = path
 
         # Get a list of children that are also containers
         for child in state.states:
 
             # If this is also a container, recurse into it
             if isinstance(child, Container):
-                self.construct(server_name, child, path + '/' + child.name)
-
-        # Publish initial state
-        proxy._publish_status('Initial state')
-
-        # Start publisher threads
-        proxy.start()
+                self.construct(server_name, child, path)
+            elif child.is_active():
+                # In case it is _not_ a container, we still want to update
+                # the active state
+                self._active_path = path + '/' + child.name
 
         # Store the proxy
         self._proxies.append(proxy)
@@ -294,8 +298,21 @@ class IntrospectionServer():
         """Clear all proxies in this server."""
         self._proxies = []
 
-    def _transition_cb(self, from_state, to_state, proxy):
-        proxy._publish_status()
+    def _transition_cb(self, from_state, to_state):
+        self._active_path = self._get_full_path(to_state)
+        self._publish_status('TRANSITION')
+
+    @staticmethod
+    def _get_full_path(state):
+        """Return the full path up to the given state."""
+        names = []
+        while state is not None:
+            names.append(state.name)
+            state = state.parent
+
+        # As we walked up from a child, we need to reverse the path's parts.
+        names.reverse()
+        return '/'.join(names)
 
     def _transition_cmd_cb(self, msg):
         to_state = self._machine
@@ -336,3 +353,26 @@ class IntrospectionServer():
             if not rospy.is_shutdown():
                 rospy.logerr(
                     "Publishing SMACH introspection structure message failed.")
+
+    def _status_pub_loop(self):
+        """Loop to publish the status heartbeat."""
+        while not rospy.is_shutdown() and self._keep_running:
+            # TODO
+            self._publish_status('HEARTBEAT')
+            try:
+                end_time = rospy.Time.now() + self._update_rate
+                while not rospy.is_shutdown() and rospy.Time.now() < end_time:
+                    rospy.sleep(0.1)
+            except:
+                pass
+
+    def _publish_status(self, info_str=''):
+        """Publish current state of this container."""
+        # Construct messages
+        with self._status_pub_lock:
+            path = self._active_path
+
+            # Construct status message
+            state_msg = msg_builder.build_status_msg(path)
+            # Publish message
+            self._status_pub.publish(state_msg)
