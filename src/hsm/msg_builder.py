@@ -10,6 +10,8 @@ from hsm.core import _History
 
 # Magic word for transitions to previous state
 HISTORY_TRANSITION_MAGIC_WORD = '__HISTORY'
+STATUS_MSG = msgs.HsmStatus
+STRUCTURE_MSG = msgs.HsmStructure
 
 
 def build_structure_msg(prefix, machine):

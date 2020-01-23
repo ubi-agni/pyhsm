@@ -6,7 +6,6 @@ import smach
 from smach_msgs.msg import SmachContainerStatus, \
     SmachContainerInitialStatusCmd
 from std_msgs.msg import Header, String
-import pyhsm_msgs.msg as msgs
 
 import hsm
 from hsm.core import Container
@@ -242,7 +241,7 @@ class IntrospectionServer():
         # Advertise structure publisher
         self._structure_pub = rospy.Publisher(
             name=server_name + STRUCTURE_TOPIC,
-            data_class=msgs.HsmStructure,
+            data_class=msg_builder.STRUCTURE_MSG,
             queue_size=1,
             latch=True)
 
