@@ -14,11 +14,11 @@ from hsm import msg_builder
 __all__ = ['IntrospectionClient', 'IntrospectionServer']
 
 # Topic names
-STATUS_TOPIC = '/smach/container_status'
+STATUS_TOPIC = '/current_state'
 INIT_TOPIC = '/smach/container_init'
-STRUCTURE_TOPIC = '/smach/container_structure'
-TRANSITION_TOPIC = '/smach/transition'
-EVENT_TOPIC = '/smach/event'
+STRUCTURE_TOPIC = '/structure'
+TRANSITION_TOPIC = '/transition'
+EVENT_TOPIC = '/event'
 
 
 class IntrospectionClient():

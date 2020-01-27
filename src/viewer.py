@@ -47,9 +47,6 @@ import wx
 import wx.richtext
 import textwrap
 
-TRANSITION_TOPIC = '/smach/transition'
-EVENT_TOPIC = '/smach/event'
-
 ## this import system (or ros-released) xdot
 # import xdot
 ## need to import currnt package, but not to load this file
@@ -661,8 +658,8 @@ class SmachViewerFrame(wx.Frame):
         parent_path = get_parent_path(state_path)
 
         server_name = self._containers[parent_path]._server_name
-        transition_pub = rospy.Publisher(server_name + TRANSITION_TOPIC,
-                                   String, queue_size=1)
+        transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
+                                         String, queue_size=1)
         transition_msg = String()
         transition_msg.data = state_path
         transition_pub.publish(transition_msg)
@@ -670,8 +667,8 @@ class SmachViewerFrame(wx.Frame):
     def on_trigger_event(self, event):
         """Event: Dispatch an event in the hsm."""
         server_name = self._containers[self._path]._server_name
-        event_pub = rospy.Publisher(server_name + EVENT_TOPIC,
-                                   String, queue_size=1)
+        event_pub = rospy.Publisher(server_name + hsm.introspection.EVENT_TOPIC,
+                                    String, queue_size=1)
         event_msg = String(self.event_combo.GetValue())
         event_pub.publish(event_msg)
 
