@@ -426,6 +426,16 @@ class SmachViewerFrame(wx.Frame):
     """
     This class provides a GUI application for viewing SMACH plans.
     """
+
+    STATUS_MSG_TIMEOUT = 2
+    """Seconds we wait for a container referenced in a status message to appear.
+    After that, we assume something went wrong and ignore the message.
+    """
+    STATUS_MSG_SLEEP_DURATION = 0.1
+    """Period in seconds that we sleep while waiting for a container referenced
+    in a status message to appear.
+    """
+
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "Smach Viewer", size=(720,480))
 
@@ -922,6 +932,12 @@ class SmachViewerFrame(wx.Frame):
         # Get the path to the updating conainer
         path = msg.path
         rospy.logdebug("STATUS MSG: "+path)
+
+        # Avoid the race condition of obtaining the status of a new tree before its structure
+        sleep_stopwatch = 0
+        while path not in self._containers and sleep_stopwatch < self.STATUS_MSG_TIMEOUT:
+            rospy.sleep(self.STATUS_MSG_SLEEP_DURATION)
+            sleep_stopwatch += self.STATUS_MSG_SLEEP_DURATION
 
         # Check if this is a known container
         needs_update = False

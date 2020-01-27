@@ -223,17 +223,13 @@ class IntrospectionServer():
         self._status_pub = rospy.Publisher(
             name=server_name + STATUS_TOPIC,
             data_class=msg_builder.STATUS_MSG,
-            queue_size=1)
+            queue_size=1,
+            latch=True)
 
         # TODO While the function is not reworked, we can comment this out.
         # self._structure_pub_thread = threading.Thread(
         #     name=server_name + ':structure_publisher',
         #     target=self._structure_pub_loop)
-
-        # Create thread to constantly publish
-        self._status_pub_thread = threading.Thread(
-            name=server_name + ':status_publisher',
-            target=self._status_pub_loop)
 
         self._keep_running = False
 
@@ -249,7 +245,7 @@ class IntrospectionServer():
         #      maybe remove `_publish_structure` line
         # self._structure_pub_thread.start()
         self._publish_structure('INITIAL')
-        self._status_pub_thread.start()
+        self._publish_status('INITIAL_STATE')
 
         self._transition_cmd = rospy.Subscriber(
             self._server_name + TRANSITION_TOPIC,
@@ -353,18 +349,6 @@ class IntrospectionServer():
             if not rospy.is_shutdown():
                 rospy.logerr(
                     "Publishing SMACH introspection structure message failed.")
-
-    def _status_pub_loop(self):
-        """Loop to publish the status heartbeat."""
-        while not rospy.is_shutdown() and self._keep_running:
-            # TODO
-            self._publish_status('HEARTBEAT')
-            try:
-                end_time = rospy.Time.now() + self._update_rate
-                while not rospy.is_shutdown() and rospy.Time.now() < end_time:
-                    rospy.sleep(0.1)
-            except:
-                pass
 
     def _publish_status(self, info_str=''):
         """Publish current state of this container."""
