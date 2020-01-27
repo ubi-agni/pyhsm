@@ -530,6 +530,7 @@ class SmachViewerFrame(wx.Frame):
         # Create tree view widget
         self.tree = wx.TreeCtrl(nb,-1,style=wx.TR_HAS_BUTTONS)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
+        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
 
         nb.AddPage(graph_view,"Graph View")
         nb.AddPage(self.tree,"Tree View")
@@ -655,6 +656,7 @@ class SmachViewerFrame(wx.Frame):
 
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
+        # TODO This never works the first time it is executed.
         state_path = self._selected_paths[0]
         parent_path = get_parent_path(state_path)
 
