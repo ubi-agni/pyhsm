@@ -244,8 +244,8 @@ class IntrospectionServer():
         # TODO after rework, uncomment and
         #      maybe remove `_publish_structure` line
         # self._structure_pub_thread.start()
-        self._publish_structure('INITIAL')
-        self._publish_status('INITIAL_STATE')
+        self._publish_structure()
+        self._publish_status()
 
         self._transition_cmd = rospy.Subscriber(
             self._server_name + TRANSITION_TOPIC,
@@ -296,7 +296,7 @@ class IntrospectionServer():
 
     def _transition_cb(self, from_state, to_state):
         self._active_path = self._get_full_path(to_state)
-        self._publish_status('TRANSITION')
+        self._publish_status()
 
     @staticmethod
     def _get_full_path(state):
@@ -339,7 +339,7 @@ class IntrospectionServer():
             except:
                 pass
 
-    def _publish_structure(self, info_str=''):
+    def _publish_structure(self):
         path = self._path
 
         structure_msg = msg_builder.build_structure_msg(path, self._machine)
@@ -350,7 +350,7 @@ class IntrospectionServer():
                 rospy.logerr(
                     "Publishing SMACH introspection structure message failed.")
 
-    def _publish_status(self, info_str=''):
+    def _publish_status(self):
         """Publish current state of this container."""
         # Construct messages
         with self._status_pub_lock:
