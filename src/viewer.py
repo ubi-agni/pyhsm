@@ -578,7 +578,8 @@ class SmachViewerFrame(wx.Frame):
 
 
         # Set content splitter
-        self.content_splitter.SplitVertically(viewer, self.ud_win, 512)
+        # Right userdata widget expands to about 300 pixels; accordingly, set the divider
+        self.content_splitter.SplitVertically(viewer, self.ud_win, -300)
 
         # Add statusbar
         self.statusbar = wx.StatusBar(self,-1)
