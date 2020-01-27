@@ -12,15 +12,15 @@ from hsm.core import _History
 HISTORY_TRANSITION_MAGIC_WORD = '__HISTORY'
 
 # Types for the public API
-STATUS_MSG = msgs.HsmStatus
+STATUS_MSG = msgs.HsmCurrentState
 STRUCTURE_MSG = msgs.HsmStructure
 
 # What type to filter ROS topics by to get these messages
-STATUS_MSG_TOPIC_TYPE = 'pyhsm_msgs/HsmStatus'
+STATUS_MSG_TOPIC_TYPE = 'pyhsm_msgs/HsmCurrentState'
 
 
 def build_status_msg(path):
-    return msgs.HsmStatus(path)
+    return msgs.HsmCurrentState(path)
 
 
 def build_structure_msg(prefix, machine):
