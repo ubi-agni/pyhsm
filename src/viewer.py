@@ -475,7 +475,7 @@ class SmachViewerFrame(wx.Frame):
         toggle_view_button.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_view)
 
         toolbar.AddControl(toggle_view_button)
-        toolbar.AddControl(wx.StaticText(toolbar, -1, '    Path: '))
+        toolbar.AddControl(wx.StaticText(toolbar, -1, '    Filter: '))
 
         # Path list
         self.path_combo = wx.ComboBox(toolbar, -1, style=wx.CB_DROPDOWN)
