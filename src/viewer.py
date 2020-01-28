@@ -528,7 +528,7 @@ class SmachViewerFrame(wx.Frame):
         # Construct second toolbar
         lower_toolbar = wx.ToolBar(viewer, -1)
 
-        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '  Path: '))
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '  Current Path: '))
 
         self.path_input = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
         self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
