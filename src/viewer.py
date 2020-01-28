@@ -540,6 +540,7 @@ class SmachViewerFrame(wx.Frame):
         # Create tree view widget
         self.tree = wx.TreeCtrl(nb,-1,style=wx.TR_HAS_BUTTONS)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
+        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
 
         nb.AddPage(graph_view,"Graph View")
         nb.AddPage(self.tree,"Tree View")
@@ -588,7 +589,8 @@ class SmachViewerFrame(wx.Frame):
 
 
         # Set content splitter
-        self.content_splitter.SplitVertically(viewer, self.ud_win, 512)
+        # Right userdata widget expands to about 300 pixels; accordingly, set the divider
+        self.content_splitter.SplitVertically(viewer, self.ud_win, -300)
 
         # Add statusbar
         self.statusbar = wx.StatusBar(self,-1)
@@ -664,6 +666,7 @@ class SmachViewerFrame(wx.Frame):
 
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
+        # TODO This never works the first time it is executed.
         state_path = self._selected_paths[0]
         parent_path = get_parent_path(state_path)
 
@@ -1158,7 +1161,7 @@ class SmachViewerFrame(wx.Frame):
 
                 self._status_subs[server_name] = rospy.Subscriber(
                         server_name+hsm.introspection.STATUS_TOPIC,
-                        msgs.HsmStatus,
+                        msgs.HsmCurrentState,
                         callback = self._status_msg_update,
                         queue_size=50)
 
@@ -1184,13 +1187,26 @@ class SmachViewerFrame(wx.Frame):
 
     def SaveDotGraph(self,event):
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        directory = rospkg.get_ros_home()+'/dotfiles/'
+        directory = rospkg.get_ros_home()+'/dotfiles'
         if not os.path.exists(directory):
-                os.makedirs(directory)
-        filename = directory+timestr+'.dot'
-        print('Writing to file: %s' % filename)
-        with open(filename, 'w') as f:
-            f.write(self.dotstr)
+            directory = '.'
+        with wx.FileDialog(self,
+                           'Save dot graph',
+                           # May error on Motif due to multiple file types.
+                           wildcard='DOT files (.dot)|*.dot|Graphviz files (.gv)|*.gv',
+                           defaultDir=directory, defaultFile=timestr+'.dot',
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            filename = file_dialog.GetPath()
+            print('Writing to file: %s' % filename)
+            try:
+                with open(filename, 'w') as f:
+                    f.write(self.dotstr)
+            except IOError as e:
+                print('Writing failed:')
+                print(e)
 
     def OnExit(self, event):
         pass
