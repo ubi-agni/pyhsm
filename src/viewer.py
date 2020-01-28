@@ -495,6 +495,21 @@ class SmachViewerFrame(wx.Frame):
         toolbar.AddControl(wx.StaticText(toolbar,-1,"    Depth: "))
         toolbar.AddControl(self.depth_spinner)
 
+        toggle_auto_focus = wx.ToggleButton(toolbar, -1, 'Auto Focus')
+        toggle_auto_focus.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_auto_focus)
+        self._auto_focus = False
+
+        toolbar.AddControl(wx.StaticText(toolbar, -1, "    "))
+        toolbar.AddControl(toggle_auto_focus)
+
+        # Implicit transition display
+        toggle_all = wx.ToggleButton(toolbar,-1,'Show Implicit')
+        toggle_all.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_all_transitions)
+        self._show_all_transitions = False
+
+        toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
+        toolbar.AddControl(toggle_all)
+
         # Label width spinner
         self.width_spinner = wx.SpinCtrl(toolbar, -1,
                 size=wx.Size(50,-1),
@@ -505,21 +520,6 @@ class SmachViewerFrame(wx.Frame):
         self._label_wrapper = textwrap.TextWrapper(40,break_long_words=True)
         toolbar.AddControl(wx.StaticText(toolbar,-1,"    Label Width: "))
         toolbar.AddControl(self.width_spinner)
-
-        # Implicit transition display
-        toggle_all = wx.ToggleButton(toolbar,-1,'Show Implicit')
-        toggle_all.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_all_transitions)
-        self._show_all_transitions = False
-
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
-        toolbar.AddControl(toggle_all)
-
-        toggle_auto_focus = wx.ToggleButton(toolbar, -1, 'Auto Focus')
-        toggle_auto_focus.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_auto_focus)
-        self._auto_focus = False
-
-        toolbar.AddControl(wx.StaticText(toolbar, -1, "    "))
-        toolbar.AddControl(toggle_auto_focus)
 
         toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
         toolbar.AddLabelTool(wx.ID_HELP, 'Help',
