@@ -467,6 +467,7 @@ class SmachViewerFrame(wx.Frame):
         toggle_view_button = wx.ToggleButton(toolbar, -1, 'Tree View')
         toggle_view_button.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_view)
 
+        toolbar.AddControl(wx.StaticText(toolbar, -1, ' '))
         toolbar.AddControl(toggle_view_button)
         toolbar.AddControl(wx.StaticText(toolbar, -1, '    Filter: '))
 
@@ -527,7 +528,7 @@ class SmachViewerFrame(wx.Frame):
         # Construct second toolbar
         lower_toolbar = wx.ToolBar(viewer, -1)
 
-        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, ' Path:'))
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '  Path: '))
 
         self.path_input = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
         self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
