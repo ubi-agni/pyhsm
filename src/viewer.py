@@ -462,20 +462,20 @@ class SmachViewerFrame(wx.Frame):
         viewer = wx.Panel(self.content_splitter,-1)
 
         # Create smach viewer 
-        nb = wx.Notebook(viewer,-1,style=wx.NB_TOP | wx.WANTS_CHARS)
-        viewer_box = wx.BoxSizer()
-        viewer_box.Add(nb,1,wx.EXPAND | wx.ALL, 4)
-        viewer.SetSizer(viewer_box)
 
         # Create graph view
-        graph_view = wx.Panel(nb,-1)
+        self.graph_view = wx.Panel(viewer, -1)
         gv_vbox = wx.BoxSizer(wx.VERTICAL)
-        graph_view.SetSizer(gv_vbox)
+        self.graph_view.SetSizer(gv_vbox)
 
         # Construct toolbar
-        toolbar = wx.ToolBar(graph_view, -1)
+        toolbar = wx.ToolBar(viewer, -1)
 
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"Path: "))
+        toggle_view_button = wx.ToggleButton(toolbar, -1, 'Tree View')
+        toggle_view_button.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_view)
+
+        toolbar.AddControl(toggle_view_button)
+        toolbar.AddControl(wx.StaticText(toolbar, -1, '    Path: '))
 
         # Path list
         self.path_combo = wx.ComboBox(toolbar, -1, style=wx.CB_DROPDOWN)
@@ -532,19 +532,23 @@ class SmachViewerFrame(wx.Frame):
         self.Bind(wx.EVT_TOOL, self.SaveDotGraph, id=wx.ID_SAVE)
 
         # Create dot graph widget
-        self.widget = xdot.wxxdot.WxDotWindow(graph_view, -1)
+        self.widget = xdot.wxxdot.WxDotWindow(self.graph_view, -1)
 
-        gv_vbox.Add(toolbar, 0, wx.EXPAND)
         gv_vbox.Add(self.widget, 1, wx.EXPAND)
 
         # Create tree view widget
-        self.tree = wx.TreeCtrl(nb,-1,style=wx.TR_HAS_BUTTONS)
+        self.tree = wx.TreeCtrl(viewer, -1, style=wx.TR_HAS_BUTTONS)
         self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
         self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
+        # Do not show tree view by default as we want the graph view.
+        self.tree.Hide()
 
-        nb.AddPage(graph_view,"Graph View")
-        nb.AddPage(self.tree,"Tree View")
+        self.viewer_box = wx.BoxSizer(wx.VERTICAL)
+        viewer.SetSizer(self.viewer_box)
 
+        self.viewer_box.Add(toolbar, 0, wx.EXPAND)
+        self.viewer_box.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
+        self.viewer_box.Add(self.tree, 1, wx.EXPAND | wx.ALL, 4)
 
         # Create userdata widget
         borders = wx.LEFT | wx.RIGHT | wx.TOP
@@ -715,6 +719,16 @@ class SmachViewerFrame(wx.Frame):
         self._label_wrapper.width = self.width_spinner.GetValue()
         self._needs_zoom = True
         self.update_graph()
+
+    def toggle_view(self, event):
+        """Event: Toggle between the graph and tree view."""
+        if self.graph_view.IsShown():
+            self.graph_view.Hide()
+            self.tree.Show()
+        else:
+            self.tree.Hide()
+            self.graph_view.Show()
+        self.viewer_box.Layout()
 
     def toggle_all_transitions(self, event):
         """Event: Change whether automatic transitions are hidden and update the graph."""
