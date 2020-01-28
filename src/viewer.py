@@ -1145,7 +1145,7 @@ class SmachViewerFrame(wx.Frame):
 
                 self._status_subs[server_name] = rospy.Subscriber(
                         server_name+hsm.introspection.STATUS_TOPIC,
-                        msgs.HsmStatus,
+                        msgs.HsmCurrentState,
                         callback = self._status_msg_update,
                         queue_size=50)
 
