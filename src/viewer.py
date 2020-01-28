@@ -533,11 +533,6 @@ class SmachViewerFrame(wx.Frame):
         self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
         lower_toolbar.AddControl(self.path_input)
 
-        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    Userdata:'))
-
-        self.ud_txt = wx.TextCtrl(lower_toolbar, -1, style=wx.TE_READONLY)
-        lower_toolbar.AddControl(self.ud_txt)
-
         # Add initial state button
         # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
         # self.is_button.Bind(wx.EVT_BUTTON, self.on_set_initial_state)
@@ -550,15 +545,6 @@ class SmachViewerFrame(wx.Frame):
         self.tt_button.Disable()
         lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
         lower_toolbar.AddControl(self.tt_button)
-
-        self.event_combo = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
-        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
-        lower_toolbar.AddControl(self.event_combo)
-
-        # Add trigger event button
-        self.event_button = wx.Button(lower_toolbar, -1, '    Trigger Event')
-        self.event_button.Bind(wx.EVT_BUTTON, self.on_trigger_event)
-        lower_toolbar.AddControl(self.event_button)
 
         # Create dot graph widget
         self.widget = xdot.wxxdot.WxDotWindow(self.graph_view, -1)
@@ -665,15 +651,6 @@ class SmachViewerFrame(wx.Frame):
         transition_msg.data = state_path
         transition_pub.publish(transition_msg)
 
-    def on_trigger_event(self, event):
-        """Event: Dispatch an event in the hsm."""
-        server_name = self._containers[self._path]._server_name
-        event_pub = rospy.Publisher(server_name + hsm.introspection.EVENT_TOPIC,
-                                    String, queue_size=1)
-        event_msg = String(self.event_combo.GetValue())
-        event_pub.publish(event_msg)
-
-
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
         self._path = self.path_combo.GetValue()
@@ -772,19 +749,6 @@ class SmachViewerFrame(wx.Frame):
                 # Enable the initial state button for the selection
                 #self.is_button.Enable()
                 self.tt_button.Enable()
-
-                # Get the container
-                container = self._containers[parent_path]
-
-                # Store the scroll position and selection
-                pos = self.ud_txt.HitTestPos(wx.Point(0,0))
-                sel = self.ud_txt.GetSelection()
-
-                # TODO remove ud_txt (we won't have it)
-                # Restore the scroll position and selection
-                self.ud_txt.ShowPosition(pos[1])
-                if sel != (0,0):
-                    self.ud_txt.SetSelection(sel[0],sel[1])
             else:
                 # Disable the initial state button for this selection
                 #self.is_button.Disable()
@@ -1002,17 +966,6 @@ class SmachViewerFrame(wx.Frame):
             with self._update_cond:
                 # Wait for the update condition to be triggered
                 self._update_cond.wait()
-
-                # update the event combo box
-                # TODO will we keep this in any way?
-                # events = []
-                # for c in self._containers.values():
-                #     for o in c._internal_outcomes:
-                #         events.append(o)
-                # if not set(events) == set(self.event_combo.GetItems()):
-                #     self.event_combo.Clear()
-                #     for e in events:
-                #         self.event_combo.Append(e)
 
                 # Get the containers to update
                 containers_to_update = {}
