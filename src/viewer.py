@@ -451,15 +451,8 @@ class SmachViewerFrame(wx.Frame):
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
-
-        # Create Splitter
-        self.content_splitter = wx.SplitterWindow(self, -1,style = wx.SP_LIVE_UPDATE)
-        self.content_splitter.SetMinimumPaneSize(24)
-        self.content_splitter.SetSashGravity(0.85)
-
-
         # Create viewer pane
-        viewer = wx.Panel(self.content_splitter,-1)
+        viewer = wx.Panel(self, -1)
 
         # Create smach viewer 
 
@@ -531,6 +524,42 @@ class SmachViewerFrame(wx.Frame):
         self.Bind(wx.EVT_TOOL, self.ShowControlsDialog, id=wx.ID_HELP)
         self.Bind(wx.EVT_TOOL, self.SaveDotGraph, id=wx.ID_SAVE)
 
+        # Construct second toolbar
+        lower_toolbar = wx.ToolBar(viewer, -1)
+
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, ' Path:'))
+
+        self.path_input = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
+        self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
+        lower_toolbar.AddControl(self.path_input)
+
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    Userdata:'))
+
+        self.ud_txt = wx.TextCtrl(lower_toolbar, -1, style=wx.TE_READONLY)
+        lower_toolbar.AddControl(self.ud_txt)
+
+        # Add initial state button
+        # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
+        # self.is_button.Bind(wx.EVT_BUTTON, self.on_set_initial_state)
+        # self.is_button.Disable()
+        # self.ud_gs.Add(self.is_button,0,wx.EXPAND | wx.BOTTOM | borders, border)
+
+        # Add trigger transition button
+        self.tt_button = wx.Button(lower_toolbar, -1, 'Trigger Transition')
+        self.tt_button.Bind(wx.EVT_BUTTON, self.on_trigger_transition)
+        self.tt_button.Disable()
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
+        lower_toolbar.AddControl(self.tt_button)
+
+        self.event_combo = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
+        lower_toolbar.AddControl(self.event_combo)
+
+        # Add trigger event button
+        self.event_button = wx.Button(lower_toolbar, -1, '    Trigger Event')
+        self.event_button.Bind(wx.EVT_BUTTON, self.on_trigger_event)
+        lower_toolbar.AddControl(self.event_button)
+
         # Create dot graph widget
         self.widget = xdot.wxxdot.WxDotWindow(self.graph_view, -1)
 
@@ -547,60 +576,15 @@ class SmachViewerFrame(wx.Frame):
         viewer.SetSizer(self.viewer_box)
 
         self.viewer_box.Add(toolbar, 0, wx.EXPAND)
+        self.viewer_box.Add(lower_toolbar, 0, wx.EXPAND)
         self.viewer_box.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
         self.viewer_box.Add(self.tree, 1, wx.EXPAND | wx.ALL, 4)
-
-        # Create userdata widget
-        borders = wx.LEFT | wx.RIGHT | wx.TOP
-        border = 4
-        self.ud_win = wx.ScrolledWindow(self.content_splitter, -1)
-        self.ud_gs = wx.BoxSizer(wx.VERTICAL)
-
-        self.ud_gs.Add(wx.StaticText(self.ud_win,-1,"Path:"),0, borders, border)
-
-        self.path_input = wx.ComboBox(self.ud_win,-1,style=wx.CB_DROPDOWN)
-        self.path_input.Bind(wx.EVT_COMBOBOX,self.selection_changed)
-        self.ud_gs.Add(self.path_input,0,wx.EXPAND | borders, border)
-
-
-        self.ud_gs.Add(wx.StaticText(self.ud_win,-1,"Userdata:"),0, borders, border)
-
-        self.ud_txt = wx.TextCtrl(self.ud_win,-1,style=wx.TE_MULTILINE | wx.TE_READONLY)
-        self.ud_gs.Add(self.ud_txt,1,wx.EXPAND | borders, border)
-        
-        # Add initial state button
-        # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
-        # self.is_button.Bind(wx.EVT_BUTTON, self.on_set_initial_state)
-        # self.is_button.Disable()
-        # self.ud_gs.Add(self.is_button,0,wx.EXPAND | wx.BOTTOM | borders, border)
-
-        # Add trigger transition button
-        self.tt_button = wx.Button(self.ud_win, -1, "Trigger Transition")
-        self.tt_button.Bind(wx.EVT_BUTTON, self.on_trigger_transition)
-        self.tt_button.Disable()
-        self.ud_gs.Add(self.tt_button, 0, wx.EXPAND | wx.BOTTOM | borders, border)
-
-
-        self.event_combo = wx.ComboBox(self.ud_win, -1, style=wx.CB_DROPDOWN)
-        self.ud_gs.Add(self.event_combo, 0, wx.EXPAND | wx.BOTTOM | borders, border)
-
-        # Add trigger event button
-        self.event_button = wx.Button(self.ud_win, -1, "Trigger Event")
-        self.event_button.Bind(wx.EVT_BUTTON, self.on_trigger_event)
-        self.ud_gs.Add(self.event_button, 0, wx.EXPAND | wx.BOTTOM | borders, border)
-
-        self.ud_win.SetSizer(self.ud_gs)
-
-
-        # Set content splitter
-        # Right userdata widget expands to about 300 pixels; accordingly, set the divider
-        self.content_splitter.SplitVertically(viewer, self.ud_win, -300)
 
         # Add statusbar
         self.statusbar = wx.StatusBar(self,-1)
 
         # Add elements to sizer
-        vbox.Add(self.content_splitter, 1, wx.EXPAND | wx.ALL)
+        vbox.Add(viewer, 1, wx.EXPAND | wx.ALL)
         vbox.Add(self.statusbar, 0, wx.EXPAND)
 
         self.SetSizer(vbox)
