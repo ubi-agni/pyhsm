@@ -1171,13 +1171,26 @@ class SmachViewerFrame(wx.Frame):
 
     def SaveDotGraph(self,event):
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        directory = rospkg.get_ros_home()+'/dotfiles/'
+        directory = rospkg.get_ros_home()+'/dotfiles'
         if not os.path.exists(directory):
-                os.makedirs(directory)
-        filename = directory+timestr+'.dot'
-        print('Writing to file: %s' % filename)
-        with open(filename, 'w') as f:
-            f.write(self.dotstr)
+            directory = '.'
+        with wx.FileDialog(self,
+                           'Save dot graph',
+                           # May error on Motif due to multiple file types.
+                           wildcard='DOT files (.dot)|*.dot|Graphviz files (.gv)|*.gv',
+                           defaultDir=directory, defaultFile=timestr+'.dot',
+                           style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as file_dialog:
+            if file_dialog.ShowModal() == wx.ID_CANCEL:
+                return
+
+            filename = file_dialog.GetPath()
+            print('Writing to file: %s' % filename)
+            try:
+                with open(filename, 'w') as f:
+                    f.write(self.dotstr)
+            except IOError as e:
+                print('Writing failed:')
+                print(e)
 
     def OnExit(self, event):
         pass
