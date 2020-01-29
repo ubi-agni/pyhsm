@@ -602,6 +602,9 @@ class SmachViewerFrame(wx.Frame):
         self._structure_subs = {}
         self._status_subs = {}
 
+        # Transition publishers
+        self._transition_pubs = {}
+
         self.Bind(wx.EVT_IDLE,self.OnIdle)
         self.Bind(wx.EVT_CLOSE,self.OnQuit)
 
@@ -657,14 +660,17 @@ class SmachViewerFrame(wx.Frame):
 
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
-        # TODO This never works the first time it is executed.
         if self._selected_paths:
             state_path = self._selected_paths[0]
-            parent_path = get_parent_path(state_path)
+            parent_path = state_path
+            prev_parent_path = ''
+            # Search for the root path of the state machine containing the selected path.
+            while (parent_path not in self._transition_pubs
+                   and parent_path != prev_parent_path):
+                prev_parent_path = parent_path
+                parent_path = get_parent_path(parent_path)
 
-            server_name = self._containers[parent_path]._server_name
-            transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
-                                             String, queue_size=1)
+            transition_pub = self._transition_pubs[parent_path]
             transition_msg = String()
             transition_msg.data = state_path
             transition_pub.publish(transition_msg)
@@ -789,6 +795,14 @@ class SmachViewerFrame(wx.Frame):
 
         with self._update_cond:
             self._build_container_tree(msg, server_name)
+            transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
+                                             String, queue_size=1)
+            if msg.states:
+                # We take the path of the first state message as that is the
+                # root of the new tree. We can do this because we know that our
+                # ``msg_builder`` module creates the tree in pre-order.
+                root_path = msg.states[0].path
+                self._transition_pubs[root_path] = transition_pub
 
             # Update the graph
             self._structure_changed = True
