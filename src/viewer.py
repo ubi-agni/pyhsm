@@ -436,6 +436,9 @@ class SmachViewerFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "Smach Viewer", size=(720,480))
 
+        # Directory for loading images relative to this file
+        img_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'img', '')
+
         # Create graph
         self._containers = {}
         self._top_containers = {}
@@ -464,11 +467,18 @@ class SmachViewerFrame(wx.Frame):
         # Construct toolbar
         toolbar = wx.ToolBar(viewer, -1)
 
-        toggle_view_button = wx.ToggleButton(toolbar, -1, 'Tree View')
-        toggle_view_button.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_view)
+        self._toggle_view_button = wx.Button(toolbar, -1, style=wx.BU_EXACTFIT)
+        self._tree_view_img = self.load_button_bitmap(img_dir + 'tree_view.png',
+                                                      wx.BITMAP_TYPE_PNG)
+        self._graph_view_img = self.load_button_bitmap(img_dir + 'graph_view.png',
+                                                       wx.BITMAP_TYPE_PNG)
+        self._toggle_view_button.SetBitmap(self._tree_view_img)
+        toggle_view_button_tooltip = wx.ToolTip('Switch between graph and tree view')
+        self._toggle_view_button.SetToolTip(toggle_view_button_tooltip)
+        self._toggle_view_button.Bind(wx.EVT_BUTTON, self.toggle_view)
 
         toolbar.AddControl(wx.StaticText(toolbar, -1, ' '))
-        toolbar.AddControl(toggle_view_button)
+        toolbar.AddControl(self._toggle_view_button)
         toolbar.AddControl(wx.StaticText(toolbar, -1, '    Filter: '))
 
         # Path list
@@ -541,7 +551,13 @@ class SmachViewerFrame(wx.Frame):
         # self.ud_gs.Add(self.is_button,0,wx.EXPAND | wx.BOTTOM | borders, border)
 
         # Add trigger transition button
-        self.tt_button = wx.Button(lower_toolbar, -1, 'Trigger Transition')
+        self.tt_button = wx.Button(lower_toolbar, -1, style=wx.BU_EXACTFIT)
+        tt_button_img = self.load_button_bitmap(img_dir + 'trigger_transition.png',
+                                                wx.BITMAP_TYPE_PNG)
+        self.tt_button.SetBitmap(tt_button_img)
+        tt_button_tooltip = wx.ToolTip('Trigger Transition')
+        self.tt_button.SetToolTip(tt_button_tooltip)
+
         self.tt_button.Bind(wx.EVT_BUTTON, self.on_trigger_transition)
         self.tt_button.Disable()
         lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
@@ -642,15 +658,16 @@ class SmachViewerFrame(wx.Frame):
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
         # TODO This never works the first time it is executed.
-        state_path = self._selected_paths[0]
-        parent_path = get_parent_path(state_path)
+        if self._selected_paths:
+            state_path = self._selected_paths[0]
+            parent_path = get_parent_path(state_path)
 
-        server_name = self._containers[parent_path]._server_name
-        transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
-                                         String, queue_size=1)
-        transition_msg = String()
-        transition_msg.data = state_path
-        transition_pub.publish(transition_msg)
+            server_name = self._containers[parent_path]._server_name
+            transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
+                                             String, queue_size=1)
+            transition_msg = String()
+            transition_msg.data = state_path
+            transition_pub.publish(transition_msg)
 
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
@@ -685,12 +702,18 @@ class SmachViewerFrame(wx.Frame):
     def toggle_view(self, event):
         """Event: Toggle between the graph and tree view."""
         if self.graph_view.IsShown():
-            self.graph_view.Hide()
-            self.tree.Show()
+            self._toggle_view(self.graph_view, self.tree, self._graph_view_img)
         else:
-            self.tree.Hide()
-            self.graph_view.Show()
+            self._toggle_view(self.tree, self.graph_view, self._tree_view_img)
         self.viewer_box.Layout()
+
+    def _toggle_view(self, shown_view, hidden_view, new_img):
+        """Hide the given shown view, show the given hidden view and set the
+        image of the 'toggle view'-button to the given new image.
+        """
+        shown_view.Hide()
+        hidden_view.Show()
+        self._toggle_view_button.SetBitmap(new_img)
 
     def toggle_all_transitions(self, event):
         """Event: Change whether automatic transitions are hidden and update the graph."""
@@ -1179,6 +1202,21 @@ class SmachViewerFrame(wx.Frame):
 
     def set_filter(self, filter):
         self.widget.set_filter(filter)
+
+    @staticmethod
+    def load_button_bitmap(path, file_type):
+        """Return a bitmap loaded from the given path correctly prepared for
+        usage in a button.
+
+        The preparation is resizing to a 16 by 16 image and initializing the
+        alpha channel.
+        """
+        img = wx.Image(path, type=file_type)
+        img.Rescale(16, 16, wx.IMAGE_QUALITY_HIGH)
+        if not img.HasAlpha():
+            img.InitAlpha()
+        bitmap = img.ConvertToBitmap()
+        return bitmap
 
 def main():
     from argparse import ArgumentParser
