@@ -83,10 +83,10 @@ def hex2t(color_str):
 
 class ContainerNode(object):
     """
-    This class represents a given container in a running SMACH system. 
+    This class represents a given container in a running HSM system.
 
-    Its primary use is to generate dotcode for a SMACH container. It has
-    methods for responding to structure and status messages from a SMACH
+    Its primary use is to generate dotcode for a HSM container. It has
+    methods for responding to structure and status messages from a HSM
     introspection server, as well as methods for updating the styles of a 
     graph once it's been drawn.
     """
@@ -397,9 +397,9 @@ class ContainerNode(object):
                         #print child_path+" NOT IN "+str(items.keys())
                         pass
 
-class SmachViewerFrame(wx.Frame):
+class HsmViewerFrame(wx.Frame):
     """
-    This class provides a GUI application for viewing SMACH plans.
+    This class provides a GUI application for viewing HSMs
     """
 
     STATUS_MSG_TIMEOUT = 2
@@ -412,7 +412,7 @@ class SmachViewerFrame(wx.Frame):
     """
 
     def __init__(self):
-        wx.Frame.__init__(self, None, -1, "Smach Viewer", size=(720,480))
+        wx.Frame.__init__(self, None, -1, "HSM Viewer", size=(720,480))
 
         # Directory for loading images relative to this file
         img_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'img', '')
@@ -430,22 +430,74 @@ class SmachViewerFrame(wx.Frame):
         # Full path to active node
         self._active_path = ''
 
-        vbox = wx.BoxSizer(wx.VERTICAL)
-
-        # Create viewer pane
-        viewer = wx.Panel(self, -1)
-
-        # Create smach viewer 
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
 
         # Create graph view
-        self.graph_view = wx.Panel(viewer, -1)
+        self.graph_view = wx.Panel(self, -1)
         gv_vbox = wx.BoxSizer(wx.VERTICAL)
         self.graph_view.SetSizer(gv_vbox)
 
-        # Construct toolbar
-        toolbar = wx.ToolBar(viewer, -1)
+        # Construct graph view toolbar
+        gv_toolbar = wx.ToolBar(self.graph_view, -1)
+        gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, 'Filter: '))
 
-        self._toggle_view_button = wx.Button(toolbar, -1, style=wx.BU_EXACTFIT)
+        # Path list
+        self.path_combo = wx.ComboBox(gv_toolbar, -1, style=wx.CB_DROPDOWN)
+        self.path_combo .Bind(wx.EVT_COMBOBOX, self.set_path)
+        self.path_combo.Append('/')
+        self.path_combo.SetValue('/')
+        gv_toolbar.AddControl(self.path_combo)
+
+        # Depth spinner
+        self.depth_spinner = wx.SpinCtrl(gv_toolbar, -1,
+                size=wx.Size(50,-1),
+                min=-1,
+                max=1337,
+                initial=-1)
+        self.depth_spinner.Bind(wx.EVT_SPINCTRL,self.set_depth)
+        self._max_depth = -1
+        gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, '    Depth: '))
+        gv_toolbar.AddControl(self.depth_spinner)
+
+        toggle_auto_focus = wx.ToggleButton(gv_toolbar, -1, 'Auto Focus')
+        toggle_auto_focus.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_auto_focus)
+        self._auto_focus = False
+
+        gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, "    "))
+        gv_toolbar.AddControl(toggle_auto_focus)
+
+        # Implicit transition display
+        toggle_all = wx.ToggleButton(gv_toolbar,-1,'Show Implicit')
+        toggle_all.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_all_transitions)
+        self._show_all_transitions = False
+
+        gv_toolbar.AddControl(wx.StaticText(gv_toolbar,-1,"    "))
+        gv_toolbar.AddControl(toggle_all)
+
+        # Label width spinner
+        self.width_spinner = wx.SpinCtrl(gv_toolbar, -1,
+                size=wx.Size(50,-1),
+                min=1,
+                max=1337,
+                initial=40)
+        self.width_spinner.Bind(wx.EVT_SPINCTRL,self.set_label_width)
+        self._label_wrapper = textwrap.TextWrapper(40,break_long_words=True)
+        gv_toolbar.AddControl(wx.StaticText(gv_toolbar,-1,"    Label Width: "))
+        gv_toolbar.AddControl(self.width_spinner)
+
+        gv_toolbar.AddControl(wx.StaticText(gv_toolbar,-1,"    "))
+        gv_toolbar.AddLabelTool(wx.ID_HELP, 'Help',
+                wx.ArtProvider.GetBitmap(wx.ART_HELP,wx.ART_OTHER,(16,16)) )
+        gv_toolbar.AddLabelTool(wx.ID_SAVE, 'Save',
+                wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE,wx.ART_OTHER,(16,16)) )
+        gv_toolbar.Realize()
+
+        self.Bind(wx.EVT_TOOL, self.ShowControlsDialog, id=wx.ID_HELP)
+        self.Bind(wx.EVT_TOOL, self.SaveDotGraph, id=wx.ID_SAVE)
+
+        # Construct main toolbar
+        main_toolbar = wx.ToolBar(self, -1)
+        self._toggle_view_button = wx.Button(main_toolbar, -1, style=wx.BU_EXACTFIT)
         self._tree_view_img = self.load_button_bitmap(img_dir + 'tree_view.png',
                                                       wx.BITMAP_TYPE_PNG)
         self._graph_view_img = self.load_button_bitmap(img_dir + 'graph_view.png',
@@ -455,72 +507,12 @@ class SmachViewerFrame(wx.Frame):
         self._toggle_view_button.SetToolTip(toggle_view_button_tooltip)
         self._toggle_view_button.Bind(wx.EVT_BUTTON, self.toggle_view)
 
-        toolbar.AddControl(wx.StaticText(toolbar, -1, ' '))
-        toolbar.AddControl(self._toggle_view_button)
-        toolbar.AddControl(wx.StaticText(toolbar, -1, '    Filter: '))
+        main_toolbar.AddControl(self._toggle_view_button)
+        main_toolbar.AddControl(wx.StaticText(main_toolbar, -1, '  Current Path: '))
 
-        # Path list
-        self.path_combo = wx.ComboBox(toolbar, -1, style=wx.CB_DROPDOWN)
-        self.path_combo .Bind(wx.EVT_COMBOBOX, self.set_path)
-        self.path_combo.Append('/')
-        self.path_combo.SetValue('/')
-        toolbar.AddControl(self.path_combo)
-
-        # Depth spinner
-        self.depth_spinner = wx.SpinCtrl(toolbar, -1,
-                size=wx.Size(50,-1),
-                min=-1,
-                max=1337,
-                initial=-1)
-        self.depth_spinner.Bind(wx.EVT_SPINCTRL,self.set_depth)
-        self._max_depth = -1
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"    Depth: "))
-        toolbar.AddControl(self.depth_spinner)
-
-        toggle_auto_focus = wx.ToggleButton(toolbar, -1, 'Auto Focus')
-        toggle_auto_focus.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_auto_focus)
-        self._auto_focus = False
-
-        toolbar.AddControl(wx.StaticText(toolbar, -1, "    "))
-        toolbar.AddControl(toggle_auto_focus)
-
-        # Implicit transition display
-        toggle_all = wx.ToggleButton(toolbar,-1,'Show Implicit')
-        toggle_all.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_all_transitions)
-        self._show_all_transitions = False
-
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
-        toolbar.AddControl(toggle_all)
-
-        # Label width spinner
-        self.width_spinner = wx.SpinCtrl(toolbar, -1,
-                size=wx.Size(50,-1),
-                min=1,
-                max=1337,
-                initial=40)
-        self.width_spinner.Bind(wx.EVT_SPINCTRL,self.set_label_width)
-        self._label_wrapper = textwrap.TextWrapper(40,break_long_words=True)
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"    Label Width: "))
-        toolbar.AddControl(self.width_spinner)
-
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
-        toolbar.AddLabelTool(wx.ID_HELP, 'Help',
-                wx.ArtProvider.GetBitmap(wx.ART_HELP,wx.ART_OTHER,(16,16)) )
-        toolbar.AddLabelTool(wx.ID_SAVE, 'Save',
-                wx.ArtProvider.GetBitmap(wx.ART_FILE_SAVE,wx.ART_OTHER,(16,16)) )
-        toolbar.Realize()
-
-        self.Bind(wx.EVT_TOOL, self.ShowControlsDialog, id=wx.ID_HELP)
-        self.Bind(wx.EVT_TOOL, self.SaveDotGraph, id=wx.ID_SAVE)
-
-        # Construct second toolbar
-        lower_toolbar = wx.ToolBar(viewer, -1)
-
-        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '  Current Path: '))
-
-        self.path_input = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
+        self.path_input = wx.ComboBox(main_toolbar, -1, style=wx.CB_DROPDOWN)
         self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
-        lower_toolbar.AddControl(self.path_input)
+        main_toolbar.AddControl(self.path_input)
 
         # Add initial state button
         # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
@@ -529,7 +521,7 @@ class SmachViewerFrame(wx.Frame):
         # self.ud_gs.Add(self.is_button,0,wx.EXPAND | wx.BOTTOM | borders, border)
 
         # Add trigger transition button
-        self.tt_button = wx.Button(lower_toolbar, -1, style=wx.BU_EXACTFIT)
+        self.tt_button = wx.Button(main_toolbar, -1, style=wx.BU_EXACTFIT)
         tt_button_img = self.load_button_bitmap(img_dir + 'trigger_transition.png',
                                                 wx.BITMAP_TYPE_PNG)
         self.tt_button.SetBitmap(tt_button_img)
@@ -538,40 +530,36 @@ class SmachViewerFrame(wx.Frame):
 
         self.tt_button.Bind(wx.EVT_BUTTON, self.on_trigger_transition)
         self.tt_button.Disable()
-        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
-        lower_toolbar.AddControl(self.tt_button)
+        main_toolbar.AddControl(wx.StaticText(main_toolbar, -1, '    '))
+        main_toolbar.AddControl(self.tt_button)
 
         # Create dot graph widget
         self.widget = xdot.wxxdot.WxDotWindow(self.graph_view, -1)
 
+        gv_vbox.Add(gv_toolbar, 0, wx.EXPAND)
         gv_vbox.Add(self.widget, 1, wx.EXPAND)
 
         # Create tree view widget
-        self.tree = wx.TreeCtrl(viewer, -1, style=wx.TR_HAS_BUTTONS)
-        self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
-        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
+        self.tree_view = wx.TreeCtrl(self, -1, style=wx.TR_HAS_BUTTONS)
+        self.tree_view.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
+        self.tree_view.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
         # Do not show tree view by default as we want the graph view.
-        self.tree.Hide()
+        self.tree_view.Hide()
 
-        self.viewer_box = wx.BoxSizer(wx.VERTICAL)
-        viewer.SetSizer(self.viewer_box)
-
-        self.viewer_box.Add(toolbar, 0, wx.EXPAND)
-        self.viewer_box.Add(lower_toolbar, 0, wx.EXPAND)
-        self.viewer_box.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
-        self.viewer_box.Add(self.tree, 1, wx.EXPAND | wx.ALL, 4)
+        self.vbox.Add(main_toolbar, 0, wx.EXPAND)
+        self.vbox.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
+        self.vbox.Add(self.tree_view, 1, wx.EXPAND | wx.ALL, 4)
 
         # Add statusbar
         self.statusbar = wx.StatusBar(self,-1)
 
         # Add elements to sizer
-        vbox.Add(viewer, 1, wx.EXPAND | wx.ALL)
-        vbox.Add(self.statusbar, 0, wx.EXPAND)
+        self.vbox.Add(self.statusbar, 0, wx.EXPAND)
 
-        self.SetSizer(vbox)
+        self.SetSizer(self.vbox)
         self.Center()
 
-        # smach introspection client
+        # HSM introspection client
         self._client = hsm.introspection.IntrospectionClient()
         self._containers= {}
         self._selected_paths = []
@@ -686,10 +674,10 @@ class SmachViewerFrame(wx.Frame):
     def toggle_view(self, event):
         """Event: Toggle between the graph and tree view."""
         if self.graph_view.IsShown():
-            self._toggle_view(self.graph_view, self.tree, self._graph_view_img)
+            self._toggle_view(self.graph_view, self.tree_view, self._graph_view_img)
         else:
-            self._toggle_view(self.tree, self.graph_view, self._tree_view_img)
-        self.viewer_box.Layout()
+            self._toggle_view(self.tree_view, self.graph_view, self._tree_view_img)
+        self.vbox.Layout()
 
     def _toggle_view(self, shown_view, hidden_view, new_img):
         """Hide the given shown view, show the given hidden view and set the
@@ -847,7 +835,7 @@ class SmachViewerFrame(wx.Frame):
 
     # TODO Rework when we actually get updates
     def _structure_msg_update(self, msg, server_name):
-        """Update the structure of the SMACH plan (re-generate the dotcode)."""
+        """Update the structure of the HSM plan (re-generate the dotcode)."""
 
         # Just return if we're shutting down
         if not self._keep_running:
@@ -971,11 +959,11 @@ class SmachViewerFrame(wx.Frame):
 
         The graph gets updated in one of two ways:
 
-          1: The structure of the SMACH plans has changed, or the display
+          1: The structure of the HSM plans has changed, or the display
           settings have been changed. In this case, the dotcode needs to be
           regenerated. 
 
-          2: The status of the SMACH plans has changed. In this case, we only
+          2: The status of the HSM plans has changed. In this case, we only
           need to change the styles of the graph.
         """
         while self._keep_running and not rospy.is_shutdown():
@@ -1047,7 +1035,7 @@ class SmachViewerFrame(wx.Frame):
         """Set the xdot view's dotcode and refresh the display."""
         # Set the new dotcode
         if self.widget.set_dotcode(dotcode, None):
-            self.SetTitle('Smach Viewer')
+            self.SetTitle('HSM Viewer')
             # Re-zoom if necessary
             if zoom or self._needs_zoom:
                 self.widget.zoom_to_fit()
@@ -1074,9 +1062,9 @@ class SmachViewerFrame(wx.Frame):
         container = self._tree_nodes.get(path, None)
         if container is None:
             if parent is None:
-                container = self.tree.AddRoot(get_label(path))
+                container = self.tree_view.AddRoot(get_label(path))
             else:
-                container = self.tree.AppendItem(parent,get_label(path))
+                container = self.tree_view.AppendItem(parent, get_label(path))
             self._tree_nodes[path] = container
             modified = True
 
@@ -1088,15 +1076,15 @@ class SmachViewerFrame(wx.Frame):
             child_path = '/'.join([path,label])
             added_children |= self.add_to_tree(child_path, container)
             if added_children:
-                self.tree.Expand(container)
+                self.tree_view.Expand(container)
 
         return modified | added_children
 
     def update_tree_status(self, tc):
         path = tc._path
         item = self._tree_nodes[path]
-        self.tree.SetItemBold(item,
-                              self._active_path.startswith(path))
+        self.tree_view.SetItemBold(item,
+                                   self._active_path.startswith(path))
         for child_label in tc._children:
             child_path = '/'.join([tc._path, child_label])
             child_item = self._tree_nodes[child_path]
@@ -1111,7 +1099,7 @@ class SmachViewerFrame(wx.Frame):
             self._needs_refresh = False
 
     def _update_server_list(self):
-        """Update the list of known SMACH introspection servers."""
+        """Update the list of known HSM introspection servers."""
         while self._keep_running:
             # Update the server list
             server_names = self._client.get_servers()
@@ -1182,8 +1170,8 @@ class SmachViewerFrame(wx.Frame):
         paths=[]
         item = event.GetItem()
         while item.IsOk():
-            paths.append(self.tree.GetItemText(item))
-            item = self.tree.GetItemParent(item)
+            paths.append(self.tree_view.GetItemText(item))
+            item = self.tree_view.GetItemParent(item)
 
         # Update the selection dropdown
         self.path_input.SetValue('/'.join(reversed(paths)))
@@ -1220,7 +1208,7 @@ def main():
     args = p.parse_args()
     app = wx.App()
 
-    frame = SmachViewerFrame()
+    frame = HsmViewerFrame()
     frame.set_filter('dot')
 
     frame.Show()
@@ -1231,6 +1219,6 @@ def main():
     app.MainLoop()
 
 if __name__ == '__main__':
-    rospy.init_node('smach_viewer',anonymous=False, disable_signals=True,log_level=rospy.INFO)
+    rospy.init_node('hsm_viewer',anonymous=False, disable_signals=True,log_level=rospy.INFO)
     sys.argv = rospy.myargv()
     main()
