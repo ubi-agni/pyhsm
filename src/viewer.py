@@ -436,6 +436,9 @@ class SmachViewerFrame(wx.Frame):
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "Smach Viewer", size=(720,480))
 
+        # Directory for loading images relative to this file
+        img_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'img', '')
+
         # Create graph
         self._containers = {}
         self._top_containers = {}
@@ -451,31 +454,32 @@ class SmachViewerFrame(wx.Frame):
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
-
-        # Create Splitter
-        self.content_splitter = wx.SplitterWindow(self, -1,style = wx.SP_LIVE_UPDATE)
-        self.content_splitter.SetMinimumPaneSize(24)
-        self.content_splitter.SetSashGravity(0.85)
-
-
         # Create viewer pane
-        viewer = wx.Panel(self.content_splitter,-1)
+        viewer = wx.Panel(self, -1)
 
         # Create smach viewer 
-        nb = wx.Notebook(viewer,-1,style=wx.NB_TOP | wx.WANTS_CHARS)
-        viewer_box = wx.BoxSizer()
-        viewer_box.Add(nb,1,wx.EXPAND | wx.ALL, 4)
-        viewer.SetSizer(viewer_box)
 
         # Create graph view
-        graph_view = wx.Panel(nb,-1)
+        self.graph_view = wx.Panel(viewer, -1)
         gv_vbox = wx.BoxSizer(wx.VERTICAL)
-        graph_view.SetSizer(gv_vbox)
+        self.graph_view.SetSizer(gv_vbox)
 
         # Construct toolbar
-        toolbar = wx.ToolBar(graph_view, -1)
+        toolbar = wx.ToolBar(viewer, -1)
 
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"Path: "))
+        self._toggle_view_button = wx.Button(toolbar, -1, style=wx.BU_EXACTFIT)
+        self._tree_view_img = self.load_button_bitmap(img_dir + 'tree_view.png',
+                                                      wx.BITMAP_TYPE_PNG)
+        self._graph_view_img = self.load_button_bitmap(img_dir + 'graph_view.png',
+                                                       wx.BITMAP_TYPE_PNG)
+        self._toggle_view_button.SetBitmap(self._tree_view_img)
+        toggle_view_button_tooltip = wx.ToolTip('Switch between graph and tree view')
+        self._toggle_view_button.SetToolTip(toggle_view_button_tooltip)
+        self._toggle_view_button.Bind(wx.EVT_BUTTON, self.toggle_view)
+
+        toolbar.AddControl(wx.StaticText(toolbar, -1, ' '))
+        toolbar.AddControl(self._toggle_view_button)
+        toolbar.AddControl(wx.StaticText(toolbar, -1, '    Filter: '))
 
         # Path list
         self.path_combo = wx.ComboBox(toolbar, -1, style=wx.CB_DROPDOWN)
@@ -495,6 +499,21 @@ class SmachViewerFrame(wx.Frame):
         toolbar.AddControl(wx.StaticText(toolbar,-1,"    Depth: "))
         toolbar.AddControl(self.depth_spinner)
 
+        toggle_auto_focus = wx.ToggleButton(toolbar, -1, 'Auto Focus')
+        toggle_auto_focus.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_auto_focus)
+        self._auto_focus = False
+
+        toolbar.AddControl(wx.StaticText(toolbar, -1, "    "))
+        toolbar.AddControl(toggle_auto_focus)
+
+        # Implicit transition display
+        toggle_all = wx.ToggleButton(toolbar,-1,'Show Implicit')
+        toggle_all.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_all_transitions)
+        self._show_all_transitions = False
+
+        toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
+        toolbar.AddControl(toggle_all)
+
         # Label width spinner
         self.width_spinner = wx.SpinCtrl(toolbar, -1,
                 size=wx.Size(50,-1),
@@ -506,21 +525,6 @@ class SmachViewerFrame(wx.Frame):
         toolbar.AddControl(wx.StaticText(toolbar,-1,"    Label Width: "))
         toolbar.AddControl(self.width_spinner)
 
-        # Implicit transition display
-        toggle_all = wx.ToggleButton(toolbar,-1,'Show Implicit')
-        toggle_all.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_all_transitions)
-        self._show_all_transitions = False
-
-        toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
-        toolbar.AddControl(toggle_all)
-
-        toggle_auto_focus = wx.ToggleButton(toolbar, -1, 'Auto Focus')
-        toggle_auto_focus.Bind(wx.EVT_TOGGLEBUTTON, self.toggle_auto_focus)
-        self._auto_focus = False
-
-        toolbar.AddControl(wx.StaticText(toolbar, -1, "    "))
-        toolbar.AddControl(toggle_auto_focus)
-
         toolbar.AddControl(wx.StaticText(toolbar,-1,"    "))
         toolbar.AddLabelTool(wx.ID_HELP, 'Help',
                 wx.ArtProvider.GetBitmap(wx.ART_HELP,wx.ART_OTHER,(16,16)) )
@@ -531,39 +535,15 @@ class SmachViewerFrame(wx.Frame):
         self.Bind(wx.EVT_TOOL, self.ShowControlsDialog, id=wx.ID_HELP)
         self.Bind(wx.EVT_TOOL, self.SaveDotGraph, id=wx.ID_SAVE)
 
-        # Create dot graph widget
-        self.widget = xdot.wxxdot.WxDotWindow(graph_view, -1)
+        # Construct second toolbar
+        lower_toolbar = wx.ToolBar(viewer, -1)
 
-        gv_vbox.Add(toolbar, 0, wx.EXPAND)
-        gv_vbox.Add(self.widget, 1, wx.EXPAND)
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '  Current Path: '))
 
-        # Create tree view widget
-        self.tree = wx.TreeCtrl(nb,-1,style=wx.TR_HAS_BUTTONS)
-        self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
-        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
+        self.path_input = wx.ComboBox(lower_toolbar, -1, style=wx.CB_DROPDOWN)
+        self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
+        lower_toolbar.AddControl(self.path_input)
 
-        nb.AddPage(graph_view,"Graph View")
-        nb.AddPage(self.tree,"Tree View")
-
-
-        # Create userdata widget
-        borders = wx.LEFT | wx.RIGHT | wx.TOP
-        border = 4
-        self.ud_win = wx.ScrolledWindow(self.content_splitter, -1)
-        self.ud_gs = wx.BoxSizer(wx.VERTICAL)
-
-        self.ud_gs.Add(wx.StaticText(self.ud_win,-1,"Path:"),0, borders, border)
-
-        self.path_input = wx.ComboBox(self.ud_win,-1,style=wx.CB_DROPDOWN)
-        self.path_input.Bind(wx.EVT_COMBOBOX,self.selection_changed)
-        self.ud_gs.Add(self.path_input,0,wx.EXPAND | borders, border)
-
-
-        self.ud_gs.Add(wx.StaticText(self.ud_win,-1,"Userdata:"),0, borders, border)
-
-        self.ud_txt = wx.TextCtrl(self.ud_win,-1,style=wx.TE_MULTILINE | wx.TE_READONLY)
-        self.ud_gs.Add(self.ud_txt,1,wx.EXPAND | borders, border)
-        
         # Add initial state button
         # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
         # self.is_button.Bind(wx.EVT_BUTTON, self.on_set_initial_state)
@@ -571,32 +551,43 @@ class SmachViewerFrame(wx.Frame):
         # self.ud_gs.Add(self.is_button,0,wx.EXPAND | wx.BOTTOM | borders, border)
 
         # Add trigger transition button
-        self.tt_button = wx.Button(self.ud_win, -1, "Trigger Transition")
+        self.tt_button = wx.Button(lower_toolbar, -1, style=wx.BU_EXACTFIT)
+        tt_button_img = self.load_button_bitmap(img_dir + 'trigger_transition.png',
+                                                wx.BITMAP_TYPE_PNG)
+        self.tt_button.SetBitmap(tt_button_img)
+        tt_button_tooltip = wx.ToolTip('Trigger Transition')
+        self.tt_button.SetToolTip(tt_button_tooltip)
+
         self.tt_button.Bind(wx.EVT_BUTTON, self.on_trigger_transition)
         self.tt_button.Disable()
-        self.ud_gs.Add(self.tt_button, 0, wx.EXPAND | wx.BOTTOM | borders, border)
+        lower_toolbar.AddControl(wx.StaticText(lower_toolbar, -1, '    '))
+        lower_toolbar.AddControl(self.tt_button)
 
+        # Create dot graph widget
+        self.widget = xdot.wxxdot.WxDotWindow(self.graph_view, -1)
 
-        self.event_combo = wx.ComboBox(self.ud_win, -1, style=wx.CB_DROPDOWN)
-        self.ud_gs.Add(self.event_combo, 0, wx.EXPAND | wx.BOTTOM | borders, border)
+        gv_vbox.Add(self.widget, 1, wx.EXPAND)
 
-        # Add trigger event button
-        self.event_button = wx.Button(self.ud_win, -1, "Trigger Event")
-        self.event_button.Bind(wx.EVT_BUTTON, self.on_trigger_event)
-        self.ud_gs.Add(self.event_button, 0, wx.EXPAND | wx.BOTTOM | borders, border)
+        # Create tree view widget
+        self.tree = wx.TreeCtrl(viewer, -1, style=wx.TR_HAS_BUTTONS)
+        self.tree.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
+        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
+        # Do not show tree view by default as we want the graph view.
+        self.tree.Hide()
 
-        self.ud_win.SetSizer(self.ud_gs)
+        self.viewer_box = wx.BoxSizer(wx.VERTICAL)
+        viewer.SetSizer(self.viewer_box)
 
-
-        # Set content splitter
-        # Right userdata widget expands to about 300 pixels; accordingly, set the divider
-        self.content_splitter.SplitVertically(viewer, self.ud_win, -300)
+        self.viewer_box.Add(toolbar, 0, wx.EXPAND)
+        self.viewer_box.Add(lower_toolbar, 0, wx.EXPAND)
+        self.viewer_box.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
+        self.viewer_box.Add(self.tree, 1, wx.EXPAND | wx.ALL, 4)
 
         # Add statusbar
         self.statusbar = wx.StatusBar(self,-1)
 
         # Add elements to sizer
-        vbox.Add(self.content_splitter, 1, wx.EXPAND | wx.ALL)
+        vbox.Add(viewer, 1, wx.EXPAND | wx.ALL)
         vbox.Add(self.statusbar, 0, wx.EXPAND)
 
         self.SetSizer(vbox)
@@ -667,24 +658,16 @@ class SmachViewerFrame(wx.Frame):
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
         # TODO This never works the first time it is executed.
-        state_path = self._selected_paths[0]
-        parent_path = get_parent_path(state_path)
+        if self._selected_paths:
+            state_path = self._selected_paths[0]
+            parent_path = get_parent_path(state_path)
 
-        server_name = self._containers[parent_path]._server_name
-        transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
-                                         String, queue_size=1)
-        transition_msg = String()
-        transition_msg.data = state_path
-        transition_pub.publish(transition_msg)
-
-    def on_trigger_event(self, event):
-        """Event: Dispatch an event in the hsm."""
-        server_name = self._containers[self._path]._server_name
-        event_pub = rospy.Publisher(server_name + hsm.introspection.EVENT_TOPIC,
-                                    String, queue_size=1)
-        event_msg = String(self.event_combo.GetValue())
-        event_pub.publish(event_msg)
-
+            server_name = self._containers[parent_path]._server_name
+            transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
+                                             String, queue_size=1)
+            transition_msg = String()
+            transition_msg.data = state_path
+            transition_pub.publish(transition_msg)
 
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
@@ -715,6 +698,22 @@ class SmachViewerFrame(wx.Frame):
         self._label_wrapper.width = self.width_spinner.GetValue()
         self._needs_zoom = True
         self.update_graph()
+
+    def toggle_view(self, event):
+        """Event: Toggle between the graph and tree view."""
+        if self.graph_view.IsShown():
+            self._toggle_view(self.graph_view, self.tree, self._graph_view_img)
+        else:
+            self._toggle_view(self.tree, self.graph_view, self._tree_view_img)
+        self.viewer_box.Layout()
+
+    def _toggle_view(self, shown_view, hidden_view, new_img):
+        """Hide the given shown view, show the given hidden view and set the
+        image of the 'toggle view'-button to the given new image.
+        """
+        shown_view.Hide()
+        hidden_view.Show()
+        self._toggle_view_button.SetBitmap(new_img)
 
     def toggle_all_transitions(self, event):
         """Event: Change whether automatic transitions are hidden and update the graph."""
@@ -774,19 +773,6 @@ class SmachViewerFrame(wx.Frame):
                 # Enable the initial state button for the selection
                 #self.is_button.Enable()
                 self.tt_button.Enable()
-
-                # Get the container
-                container = self._containers[parent_path]
-
-                # Store the scroll position and selection
-                pos = self.ud_txt.HitTestPos(wx.Point(0,0))
-                sel = self.ud_txt.GetSelection()
-
-                # TODO remove ud_txt (we won't have it)
-                # Restore the scroll position and selection
-                self.ud_txt.ShowPosition(pos[1])
-                if sel != (0,0):
-                    self.ud_txt.SetSelection(sel[0],sel[1])
             else:
                 # Disable the initial state button for this selection
                 #self.is_button.Disable()
@@ -1005,17 +991,6 @@ class SmachViewerFrame(wx.Frame):
                 # Wait for the update condition to be triggered
                 self._update_cond.wait()
 
-                # update the event combo box
-                # TODO will we keep this in any way?
-                # events = []
-                # for c in self._containers.values():
-                #     for o in c._internal_outcomes:
-                #         events.append(o)
-                # if not set(events) == set(self.event_combo.GetItems()):
-                #     self.event_combo.Clear()
-                #     for e in events:
-                #         self.event_combo.Append(e)
-
                 # Get the containers to update
                 containers_to_update = {}
                 if self._path in self._containers:
@@ -1227,6 +1202,21 @@ class SmachViewerFrame(wx.Frame):
 
     def set_filter(self, filter):
         self.widget.set_filter(filter)
+
+    @staticmethod
+    def load_button_bitmap(path, file_type):
+        """Return a bitmap loaded from the given path correctly prepared for
+        usage in a button.
+
+        The preparation is resizing to a 16 by 16 image and initializing the
+        alpha channel.
+        """
+        img = wx.Image(path, type=file_type)
+        img.Rescale(16, 16, wx.IMAGE_QUALITY_HIGH)
+        if not img.HasAlpha():
+            img.InitAlpha()
+        bitmap = img.ConvertToBitmap()
+        return bitmap
 
 def main():
     from argparse import ArgumentParser
