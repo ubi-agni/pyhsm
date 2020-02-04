@@ -810,22 +810,27 @@ class HsmViewerFrame(wx.Frame):
 
         # Here we reverse once again, going from root to leaf nodes; once again in pre-order.
         paths_labels.reverse()
-        self._fill_selectors(paths_labels)
+        self._fill_selectors(paths_labels, prefix)
 
         # return root container (the one created last)
         return container
 
-    def _fill_selectors(self, paths_labels):
+    def _fill_selectors(self, paths_labels, prefix):
         """Fill the path selectors with the paths and labels contained as
         tuples in the given list.
         """
         # Store the previous parent's path and the corresponding nodes of the ``TreeComboBox``es
         # as a tuple (path, node of ``self.path_combo``, node of ``self.path_input``).
         prev_parents = []
+        pc_prefix_root = self.path_combo.FindItemWithClientData(prefix)
+        pi_prefix_root = self.path_input.FindItemWithClientData(prefix)
 
         # Append paths to selectors
         for (path, label) in paths_labels:
-            pc_parent, pi_parent = self._selectors_get_parents(label, prev_parents)
+            pc_parent, pi_parent = self._selectors_get_parents(label,
+                                                               prev_parents,
+                                                               pc_prefix_root,
+                                                               pi_prefix_root)
 
             pc_parent = self.path_combo.AppendItem(pc_parent, label, data=wx.TreeItemData(path))
             pi_parent = self.path_input.AppendItem(pi_parent, label, data=wx.TreeItemData(path))
@@ -840,8 +845,11 @@ class HsmViewerFrame(wx.Frame):
         self.path_combo.ExpandAll()
         self.path_input.ExpandAll()
 
-    def _selectors_get_parents(self, label, prev_parents):
-        """Return the selector items that are parents to a child with the given label."""
+    def _selectors_get_parents(self, label, prev_parents,
+                               path_combo_prefix_root, path_input_prefix_root):
+        """Return the selector items that are parents to a child with the given label.
+        The hierarchically highest node is ``prefix_root`` even if it is not the global root.
+        """
         # Go up the previous parents until we find the label as a child.
         while (prev_parents
                and label not in self._selectors_get_next_children(prev_parents)):
@@ -851,11 +859,8 @@ class HsmViewerFrame(wx.Frame):
             return (prev_parents[-1].path_combo_node,
                     prev_parents[-1].path_input_node)
         else:
-            # FIXME Fix this so the new containers are correctly appended to their
-            #       path (prefix) instead of always to the root node.
             # We went up the whole parent tree and none are left -- start from root!
-            return (self.path_combo.GetRootItem(),
-                    self.path_input.GetRootItem())
+            return path_combo_prefix_root, path_input_prefix_root
 
     def _selectors_get_next_children(self, prev_parents):
         """Return the children of the next parent in the given list of previous parents."""
