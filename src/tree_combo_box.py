@@ -33,6 +33,17 @@ class TreeComboBox(ComboCtrl):
         """Public interface to the internal tree's ``wx.TreeCtrl.AppendItem``."""
         return self.__tree_ctrl.AppendItem(*args, **kwargs)
 
+    def FindItemWithClientData(self, text):
+        """Return the item in the tree with the given ``text`` as client data
+        or the tree's root if none was found.
+        """
+        found = self.__tree_popup.FindItemWithClientData(self.GetRootItem(), text)
+        if found:
+            return found
+        else:
+            # This also returns a new root if there is none.
+            return self.GetRootItem()
+
     def Expand(self, *args, **kwargs):
         """Public interface to the internal tree's ``wx.TreeCtrl.Expand``."""
         return self.__tree_ctrl.Expand(*args, **kwargs)
@@ -84,7 +95,7 @@ class TreeCtrlComboPopup(ComboPopup):
 
     def FindItemWithClientData(self, parent_item, text):
         """Iterate through the tree data starting from ``parent_item`` until an
-        item's client data matches the given ``text``.
+        item's client data matches the given ``text`` and return that item.
         """
         item_data = self.__tree_ctrl.GetItemData(parent_item)
         if item_data.GetData() == text:
