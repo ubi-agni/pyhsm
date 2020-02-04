@@ -37,6 +37,7 @@ import rospkg
 
 from std_msgs.msg import String
 
+import collections
 import sys
 import os
 import threading
@@ -50,6 +51,7 @@ import textwrap
 from smach_viewer import xdot
 import pyhsm_msgs.msg as msgs
 import hsm.introspection
+from tree_combo_box import TreeComboBox
 
 ### Helper Functions
 def graph_attr_string(attrs):
@@ -80,6 +82,12 @@ def hex2t(color_str):
     """Convert a hexadecimal color strng into a color tuple."""
     color_tuple = [int(color_str[i:i+2],16)/255.0    for i in range(1,len(color_str),2)]
     return color_tuple
+
+
+### Helper Structs
+# For searching: class _PrevParent(tuple):
+_PrevParent = collections.namedtuple('_PrevParent', ('path', 'path_combo_node', 'path_input_node'))
+
 
 class ContainerNode(object):
     """
@@ -429,9 +437,9 @@ class HsmViewerFrame(wx.Frame):
         gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, 'Filter: '))
 
         # Path list
-        self.path_combo = wx.ComboBox(gv_toolbar, -1, style=wx.CB_DROPDOWN)
-        self.path_combo .Bind(wx.EVT_COMBOBOX, self.set_path)
-        self.path_combo.Append('/')
+        self.path_combo = TreeComboBox(gv_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN)
+        self.path_combo.Bind(wx.EVT_TEXT, self.set_path)
+        self.path_combo.AddRoot('/', data=wx.TreeItemData('/'))
         self.path_combo.SetValue('/')
         gv_toolbar.AddControl(self.path_combo)
 
@@ -497,8 +505,11 @@ class HsmViewerFrame(wx.Frame):
         main_toolbar.AddControl(self._toggle_view_button)
         main_toolbar.AddControl(wx.StaticText(main_toolbar, -1, '  Current Path: '))
 
-        self.path_input = wx.ComboBox(main_toolbar, -1, style=wx.CB_DROPDOWN)
-        self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
+        self.path_input = TreeComboBox(main_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
+                                       tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
+        self.path_input.Bind(wx.EVT_TEXT, self.selection_changed)
+        # This will be hidden but is necessary to have multiple 'root' nodes.
+        self.path_input.AddRoot('', data=wx.TreeItemData(''))
         main_toolbar.AddControl(self.path_input)
 
         # Add initial state button
@@ -700,7 +711,7 @@ class HsmViewerFrame(wx.Frame):
             self.path_input.SetValue(item.url)
             wx.PostEvent(
                     self.path_input.GetEventHandler(),
-                    wx.CommandEvent(wx.wxEVT_COMMAND_COMBOBOX_SELECTED,self.path_input.GetId()))
+                    wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_input.GetId()))
             self.update_graph()
 
     def selection_changed(self, event):
@@ -770,6 +781,9 @@ class HsmViewerFrame(wx.Frame):
         # Mapping from parent paths to list of child labels
         children_of = {}
 
+        # Store paths and labels to be able to reverse them later.
+        paths_labels = []
+
         container = None
 
         # We go through the states in reverse as we create the tree from the
@@ -781,6 +795,7 @@ class HsmViewerFrame(wx.Frame):
             pathsplit = path.split('/')
             parent_path = '/'.join(pathsplit[0:-1])
             label = pathsplit[-1]
+            paths_labels.append((path, label))
 
             rospy.logdebug("CONSTRUCTING: " + path)
 
@@ -793,12 +808,60 @@ class HsmViewerFrame(wx.Frame):
             container = ContainerNode(state_msg, prefix, children_of.get(path, []))
             self._containers[path] = container
 
-            # Append paths to selector
-            self.path_combo.Append(path)
-            self.path_input.Append(path)
+        # Here we reverse once again, going from root to leaf nodes; once again in pre-order.
+        paths_labels.reverse()
+        self._fill_selectors(paths_labels)
 
         # return root container (the one created last)
         return container
+
+    def _fill_selectors(self, paths_labels):
+        """Fill the path selectors with the paths and labels contained as
+        tuples in the given list.
+        """
+        # Store the previous parent's path and the corresponding nodes of the ``TreeComboBox``es
+        # as a tuple (path, node of ``self.path_combo``, node of ``self.path_input``).
+        prev_parents = []
+
+        # Append paths to selectors
+        for (path, label) in paths_labels:
+            pc_parent, pi_parent = self._selectors_get_parents(label, prev_parents)
+
+            pc_parent = self.path_combo.AppendItem(pc_parent, label, data=wx.TreeItemData(path))
+            pi_parent = self.path_input.AppendItem(pi_parent, label, data=wx.TreeItemData(path))
+            # TODO This does not work for some reason. ``ExpandAll`` calls below.
+            # self.path_combo.Expand(pc_parent)
+            # self.path_input.Expand(pi_parent)
+            prev_parent = _PrevParent(path=path,
+                                      path_combo_node=pc_parent,
+                                      path_input_node=pi_parent)
+            prev_parents.append(prev_parent)
+
+        self.path_combo.ExpandAll()
+        self.path_input.ExpandAll()
+
+    def _selectors_get_parents(self, label, prev_parents):
+        """Return the selector items that are parents to a child with the given label."""
+        # Go up the previous parents until we find the label as a child.
+        while (prev_parents
+               and label not in self._selectors_get_next_children(prev_parents)):
+            del prev_parents[-1]
+
+        if prev_parents:
+            return (prev_parents[-1].path_combo_node,
+                    prev_parents[-1].path_input_node)
+        else:
+            # FIXME Fix this so the new containers are correctly appended to their
+            #       path (prefix) instead of always to the root node.
+            # We went up the whole parent tree and none are left -- start from root!
+            return (self.path_combo.GetRootItem(),
+                    self.path_input.GetRootItem())
+
+    def _selectors_get_next_children(self, prev_parents):
+        """Return the children of the next parent in the given list of previous parents."""
+        prev_parent = prev_parents[-1]
+        prev_parent_container = self._containers[prev_parent.path]
+        return prev_parent_container._children
 
     def _status_msg_update(self, msg):
         """Process status messages."""
@@ -1074,7 +1137,7 @@ class HsmViewerFrame(wx.Frame):
         self.path_input.SetValue('/'.join(reversed(paths)))
         wx.PostEvent(
             self.path_input.GetEventHandler(),
-            wx.CommandEvent(wx.wxEVT_COMMAND_COMBOBOX_SELECTED, self.path_input.GetId()))
+            wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_input.GetId()))
         event.Skip()
 
     def set_filter(self, filter):
