@@ -398,15 +398,6 @@ class HsmViewerFrame(wx.Frame):
     This class provides a GUI application for viewing HSMs
     """
 
-    STATUS_MSG_TIMEOUT = 2
-    """Seconds we wait for a container referenced in a status message to appear.
-    After that, we assume something went wrong and ignore the message.
-    """
-    STATUS_MSG_SLEEP_DURATION = 0.1
-    """Period in seconds that we sleep while waiting for a container referenced
-    in a status message to appear.
-    """
-
     def __init__(self):
         wx.Frame.__init__(self, None, -1, "HSM Viewer", size=(720,480))
 
@@ -418,8 +409,8 @@ class HsmViewerFrame(wx.Frame):
         self._top_containers = {}
         self._tree_nodes = {}
         self._update_cond = threading.Condition()
-        self._graph_update_complete = False
-        self._tree_update_complete = False
+        self._needs_graph_update = False
+        self._needs_tree_update = False
         self._needs_refresh = True
         self.dotstr = ''
 
@@ -581,18 +572,10 @@ class HsmViewerFrame(wx.Frame):
         self._server_list_thread = threading.Thread(target=self._update_server_list)
         self._server_list_thread.start()
 
-        # Wait till we have received the first structure message with a top container
-        with self._update_cond:
-            while not self._top_containers:
-                if not self._update_cond.wait(5.0):
-                    print('Waiting for a structure message containing a root node...')
-
         self._update_graph_thread = threading.Thread(target=self._update_graph)
         self._update_graph_thread.start()
         self._update_tree_thread = threading.Thread(target=self._update_tree)
         self._update_tree_thread.start()
-
-        self.widget.Refresh()
 
     def OnQuit(self,event):
         """Quit Event: kill threads and wait for join."""
@@ -609,6 +592,7 @@ class HsmViewerFrame(wx.Frame):
     def update_graph(self):
         """Notify all that the graph needs to be updated."""
         with self._update_cond:
+            self._needs_graph_update = True
             self._update_cond.notify_all()
 
     def on_set_initial_state(self, event):
@@ -765,17 +749,16 @@ class HsmViewerFrame(wx.Frame):
             # Update the graph
             self._structure_changed = True
             self._needs_zoom = True  # TODO: Make it so you can disable this
+            self._needs_graph_update = True
+            self._needs_tree_update = True
             self._update_cond.notify_all()
 
-        # We want to wait until the first loop of ``self._update_graph`` and
-        # ``self._update_tree`` is complete; only this way do we know the viewer
-        # is set up, avoiding a race condition.
-        while (self._structure_changed
-               or not self._graph_update_complete
-               or not self._tree_update_complete):
-            with self._update_cond:
-                self._update_cond.notify_all()
-            rospy.sleep(0.2)
+        # After first structure message, when structure tree was built, create status subscriber
+        self._status_subs[server_name] = rospy.Subscriber(
+            server_name + hsm.introspection.STATUS_TOPIC,
+            msgs.HsmCurrentState,
+            callback=self._status_msg_update,
+            queue_size=50)
 
     def _build_container_tree(self, msg):
         """Build the structural tree of ``ContainerNode``s from the given
@@ -830,12 +813,6 @@ class HsmViewerFrame(wx.Frame):
         path = msg.path
         rospy.logdebug("STATUS MSG: "+path)
 
-        # Avoid the race condition of obtaining the status of a new tree before its structure
-        sleep_stopwatch = 0
-        while path not in self._containers and sleep_stopwatch < self.STATUS_MSG_TIMEOUT:
-            rospy.sleep(self.STATUS_MSG_SLEEP_DURATION)
-            sleep_stopwatch += self.STATUS_MSG_SLEEP_DURATION
-
         # Check if this is a known container
         needs_update = False
         with self._update_cond:
@@ -855,8 +832,12 @@ class HsmViewerFrame(wx.Frame):
 
                     self._update_parents(path, True)
                     needs_update = True
+            else:
+                rospy.logwarn("unknown state: " + path)
 
             if needs_update:
+                self._needs_graph_update = True
+                self._needs_tree_update = True
                 self._update_cond.notify_all()
 
     def _update_parents(self, path, set_active):
@@ -897,10 +878,14 @@ class HsmViewerFrame(wx.Frame):
           2: The status of the HSM plans has changed. In this case, we only
           need to change the styles of the graph.
         """
-        while self._keep_running and not rospy.is_shutdown():
+        while True:
             with self._update_cond:
                 # Wait for the update condition to be triggered
-                self._update_cond.wait()
+                while not self._needs_graph_update:
+                    self._update_cond.wait()
+                    if not self._keep_running or rospy.is_shutdown():
+                        return
+                self._needs_graph_update = False
 
                 # Get the containers to update
                 containers_to_update = {}
@@ -960,7 +945,6 @@ class HsmViewerFrame(wx.Frame):
 
                 # Redraw
                 self.widget.Refresh()
-                self._graph_update_complete = True
 
     def set_dotcode(self, dotcode, zoom=True):
         """Set the xdot view's dotcode and refresh the display."""
@@ -977,15 +961,19 @@ class HsmViewerFrame(wx.Frame):
 
     def _update_tree(self):
         """Update the tree view."""
-        while self._keep_running and not rospy.is_shutdown():
+        while True:
             with self._update_cond:
-                self._update_cond.wait()
-                modified = False
+                # Wait for the update condition to be triggered
+                while not self._needs_tree_update:
+                    self._update_cond.wait()
+                    if not self._keep_running or rospy.is_shutdown():
+                        return
+                self._needs_tree_update = False
+
                 for path,tc in self._top_containers.iteritems():
-                    modified |= self.add_to_tree(path, None)
+                    self.add_to_tree(path, None)
                     self.update_tree_status(tc)
-                #self.tree.ExpandAll() (caused spurious crashes)
-                self._tree_update_complete = True
+
 
     def add_to_tree(self, path, parent):
         """Add a path to the tree view."""
@@ -1026,7 +1014,6 @@ class HsmViewerFrame(wx.Frame):
         """Event: On Idle, refresh the display if necessary, then un-set the flag."""
         if self._needs_refresh:
             self.Refresh()
-            # Re-populate path combo
             self._needs_refresh = False
 
     def _update_server_list(self):
@@ -1045,25 +1032,8 @@ class HsmViewerFrame(wx.Frame):
                         callback_args = server_name,
                         queue_size=50)
 
-                self._status_subs[server_name] = rospy.Subscriber(
-                        server_name+hsm.introspection.STATUS_TOPIC,
-                        msgs.HsmCurrentState,
-                        callback = self._status_msg_update,
-                        queue_size=50)
-
-
-
-            # This doesn't need to happen very often
+            # Don't update the list too often
             rospy.sleep(1.0)
-            
-            
-            #self.server_combo.AppendItems([s for s in self._servers if s not in current_servers])
-
-            # Grab the first server
-            #current_value = self.server_combo.GetValue()
-            #if current_value == '' and len(self._servers) > 0:
-            #    self.server_combo.SetStringSelection(self._servers[0])
-            #    self.set_server(self._servers[0])
 
     def ShowControlsDialog(self,event):
         dial = wx.MessageDialog(None,
