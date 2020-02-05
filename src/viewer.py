@@ -437,7 +437,8 @@ class HsmViewerFrame(wx.Frame):
         gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, 'Filter: '))
 
         # Path list
-        self.path_combo = TreeComboBox(gv_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN)
+        self.path_combo = TreeComboBox(gv_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
+                                       tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
         self.path_combo.Bind(wx.EVT_TEXT, self.set_path)
         self.path_combo.AddRoot('/', data=wx.TreeItemData('/'))
         self.path_combo.SetValue('/')
