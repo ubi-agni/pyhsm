@@ -1082,9 +1082,6 @@ class HsmViewerFrame(wx.Frame):
             wx.CommandEvent(wx.wxEVT_COMMAND_COMBOBOX_SELECTED, self.path_input.GetId()))
         event.Skip()
 
-    def set_filter(self, filter):
-        self.widget.set_filter(filter)
-
     @staticmethod
     def load_button_bitmap(path, file_type):
         """Return a bitmap loaded from the given path correctly prepared for
@@ -1111,8 +1108,6 @@ def main():
     app = wx.App()
 
     frame = HsmViewerFrame()
-    frame.set_filter('dot')
-
     frame.Show()
 
     if args.enable_auto_focus:
