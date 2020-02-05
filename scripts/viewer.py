@@ -756,13 +756,13 @@ class HsmViewerFrame(wx.Frame):
                     if self._active_path in self._containers:
                         self._containers[prev_active_path].is_active = False
 
-                    # We update the parents even if the child is gone
-                    self._update_parents(prev_active_path, False)
+                    # We try to update the parent even if the child is gone
+                    self._update_parent(prev_active_path, False)
 
                     container.is_active = True
                     self._active_path = container._path
 
-                    self._update_parents(path, True)
+                    self._update_parent(path, True)
                     needs_update = True
             else:
                 rospy.logwarn("unknown state: " + path)
@@ -772,31 +772,26 @@ class HsmViewerFrame(wx.Frame):
                 self._needs_tree_update = True
                 self._update_cond.notify_all()
 
-    def _update_parents(self, path, set_active):
-        """Go up the tree from the given path, setting all sequential parents
-        to ``set_active`` and update their active children accordingly.
+    def _update_parent(self, path, set_active):
+        """Go up the tree from the given path and set the parent to ``set_active``,
+        updating its active children accordingly.
         """
         pathsplit = path.split('/')
+        if len(pathsplit) <= 1:
+            # There are no parents -- quit
+            return
+
         if set_active and path in self._containers:
             child = self._containers[path]
             active_children = [child._label]
         else:
             active_children = []
-        del pathsplit[-1]
 
-        while pathsplit:
-            parent_path = '/'.join(pathsplit)
+        parent_path = '/'.join(pathsplit[:-1])
 
-            # TODO Should we break in the else-case?
-            if parent_path in self._containers:
-                parent = self._containers[parent_path]
-                parent.active_states = active_children
-
-                # Update ``active_children``
-                if set_active:
-                    active_children = [parent._label]
-
-            del pathsplit[-1]
+        if parent_path in self._containers:
+            parent = self._containers[parent_path]
+            parent.active_states = active_children
 
     def _update_graph(self):
         """This thread continuously updates the graph when it changes.
