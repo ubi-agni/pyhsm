@@ -303,13 +303,8 @@ class ContainerNode(object):
                         elif 0 and child_label in self._initial_states:
                             child_fillcolor[3] = 0.25
                         else:
-                            if max_depth > 0:
-                                v = 1.0-0.25*((depth+1)/float(max_depth))
-                            else:
-                                v = 0.85
-                            child_fillcolor = [v,v,v,1.0]
+                            child_fillcolor = [0.98, 0.98, 0.98, 1.0]
 
-                        
                         for shape in subgraph_shapes['cluster_'+child_path]:
                             pen = shape.pen
                             if len(pen.color) > 3:
