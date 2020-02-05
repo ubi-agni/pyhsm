@@ -86,7 +86,9 @@ def hex2t(color_str):
 
 ### Helper Structs
 # For searching: class _PrevParent(tuple):
-_PrevParent = collections.namedtuple('_PrevParent', ('path', 'path_combo_node', 'path_input_node'))
+_PrevParent = collections.namedtuple('_PrevParent', ('path',
+                                                     'path_filter_combo_node',
+                                                     'path_combo_node'))
 
 
 class ContainerNode(object):
@@ -437,12 +439,12 @@ class HsmViewerFrame(wx.Frame):
         gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, 'Filter: '))
 
         # Path list
-        self.path_combo = TreeComboBox(gv_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
-                                       tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
-        self.path_combo.Bind(wx.EVT_TEXT, self.set_path)
-        self.path_combo.AddRoot('/', data=wx.TreeItemData('/'))
-        self.path_combo.SetValue('/')
-        gv_toolbar.AddControl(self.path_combo)
+        self.path_filter_combo = TreeComboBox(gv_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
+                                              tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
+        self.path_filter_combo.Bind(wx.EVT_TEXT, self.set_path)
+        self.path_filter_combo.AddRoot('/', data=wx.TreeItemData('/'))
+        self.path_filter_combo.SetValue('/')
+        gv_toolbar.AddControl(self.path_filter_combo)
 
         # Depth spinner
         self.depth_spinner = wx.SpinCtrl(gv_toolbar, -1,
@@ -506,12 +508,12 @@ class HsmViewerFrame(wx.Frame):
         main_toolbar.AddControl(self._toggle_view_button)
         main_toolbar.AddControl(wx.StaticText(main_toolbar, -1, '  Current Path: '))
 
-        self.path_input = TreeComboBox(main_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
+        self.path_combo = TreeComboBox(main_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
                                        tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
-        self.path_input.Bind(wx.EVT_TEXT, self.selection_changed)
+        self.path_combo.Bind(wx.EVT_TEXT, self.selection_changed)
         # This will be hidden but is necessary to have multiple 'root' nodes.
-        self.path_input.AddRoot('', data=wx.TreeItemData(''))
-        main_toolbar.AddControl(self.path_input)
+        self.path_combo.AddRoot('', data=wx.TreeItemData(''))
+        main_toolbar.AddControl(self.path_combo)
 
         # Add initial state button
         # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
@@ -635,14 +637,14 @@ class HsmViewerFrame(wx.Frame):
 
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
-        self._path = self.path_combo.GetValue()
+        self._path = self.path_filter_combo.GetValue()
         self._needs_zoom = True
         self.update_graph()
 
     def _set_path(self, path):
         self._path = path
         self._needs_zoom = True
-        self.path_combo.SetValue(path)
+        self.path_filter_combo.SetValue(path)
         self.update_graph()
 
     def set_depth(self, event):
@@ -709,22 +711,22 @@ class HsmViewerFrame(wx.Frame):
         # Left button-up
         if event.LeftDown():
             # Update the selection dropdown
-            self.path_input.SetValue(item.url)
+            self.path_combo.SetValue(item.url)
             wx.PostEvent(
-                    self.path_input.GetEventHandler(),
-                    wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_input.GetId()))
+                    self.path_combo.GetEventHandler(),
+                    wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_combo.GetId()))
             self.update_graph()
 
     def selection_changed(self, event):
         """Event: Selection dropdown changed."""
-        path_input_str = self.path_input.GetValue()
+        path_combo_str = self.path_combo.GetValue()
         # Store this item's url as the selected path
-        self._selected_paths = [path_input_str]
+        self._selected_paths = [path_combo_str]
 
         # Check the path is non-zero length
-        if len(path_input_str) > 0:
+        if len(path_combo_str) > 0:
             # Split the path (state:outcome), and get the state path
-            path = path_input_str.split(':')[0]
+            path = path_combo_str.split(':')[0]
 
             # Get the container corresponding to this path, since userdata is
             # stored in the containers
@@ -817,35 +819,39 @@ class HsmViewerFrame(wx.Frame):
         return container
 
     def _fill_selectors(self, path_labels, prefix):
-        """Fill the path selectors with the paths and labels contained as tuples in the given list."""
+        """Fill the path selectors with the paths and labels contained as
+        tuples in the given list.
+        """
         # Store the previous parent's path and the corresponding nodes of the ``TreeComboBox``es
-        # as a tuple (path, node of ``self.path_combo``, node of ``self.path_input``).
+        # as a tuple (path, node of ``self.path_filter_combo``, node of ``self.path_combo``).
         prev_parents = []
+        pfc_prefix_root = self.path_filter_combo.FindItemWithClientData(prefix)
         pc_prefix_root = self.path_combo.FindItemWithClientData(prefix)
-        pi_prefix_root = self.path_input.FindItemWithClientData(prefix)
 
         # Append paths to selectors
         for (path, label) in path_labels:
-            pc_parent, pi_parent = self._selectors_get_parents(label,
-                                                               prev_parents,
-                                                               pc_prefix_root,
-                                                               pi_prefix_root)
+            pfc_parent, pc_parent = self._selectors_get_parents(label,
+                                                                prev_parents,
+                                                                pfc_prefix_root,
+                                                                pc_prefix_root)
 
+            pfc_parent = self.path_filter_combo.AppendItem(pfc_parent,
+                                                           label,
+                                                           data=wx.TreeItemData(path))
             pc_parent = self.path_combo.AppendItem(pc_parent, label, data=wx.TreeItemData(path))
-            pi_parent = self.path_input.AppendItem(pi_parent, label, data=wx.TreeItemData(path))
             # TODO This does not work for some reason. ``ExpandAll`` calls below.
+            # self.path_filter_combo.Expand(pfc_parent)
             # self.path_combo.Expand(pc_parent)
-            # self.path_input.Expand(pi_parent)
             prev_parent = _PrevParent(path=path,
-                                      path_combo_node=pc_parent,
-                                      path_input_node=pi_parent)
+                                      path_filter_combo_node=pfc_parent,
+                                      path_combo_node=pc_parent)
             prev_parents.append(prev_parent)
 
+        self.path_filter_combo.ExpandAll()
         self.path_combo.ExpandAll()
-        self.path_input.ExpandAll()
 
     def _selectors_get_parents(self, label, prev_parents,
-                               path_combo_prefix_root, path_input_prefix_root):
+                               path_filter_combo_prefix_root, path_combo_prefix_root):
         """Return the selector items that are parents to a child with the given label.
         The hierarchically highest node is ``prefix_root`` even if it is not the global root.
         """
@@ -855,11 +861,11 @@ class HsmViewerFrame(wx.Frame):
             del prev_parents[-1]
 
         if prev_parents:
-            return (prev_parents[-1].path_combo_node,
-                    prev_parents[-1].path_input_node)
+            return (prev_parents[-1].path_filter_combo_node,
+                    prev_parents[-1].path_combo_node)
         else:
             # We went up the whole parent tree and none are left -- start from root!
-            return path_combo_prefix_root, path_input_prefix_root
+            return path_filter_combo_prefix_root, path_combo_prefix_root
 
     def _selectors_get_next_children(self, prev_parents):
         """Return the children of the next parent in the given list of previous parents."""
@@ -1138,10 +1144,10 @@ class HsmViewerFrame(wx.Frame):
             item = self.tree_view.GetItemParent(item)
 
         # Update the selection dropdown
-        self.path_input.SetValue('/'.join(reversed(paths)))
+        self.path_combo.SetValue('/'.join(reversed(paths)))
         wx.PostEvent(
-            self.path_input.GetEventHandler(),
-            wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_input.GetId()))
+            self.path_combo.GetEventHandler(),
+            wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_combo.GetId()))
         event.Skip()
 
     def set_filter(self, filter):
