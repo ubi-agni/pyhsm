@@ -225,68 +225,6 @@ class ContainerNode(object):
                     child_attrs['URL'] = child_path
                     dotstr += '"%s" %s;\n' % (child_path, attr_string(child_attrs))
 
-            # Iterate over edges
-            internal_edges = []
-
-            # Add edge from container label to initial state
-            internal_edges += [('','__proxy__',initial_child) for initial_child in self._initial_states]
-
-            has_explicit_transitions = []
-            for (outcome_label,from_label,to_label) in internal_edges:
-                if to_label != 'None' or outcome_label == to_label:
-                    has_explicit_transitions.append(from_label)
-
-            # Draw internal edges
-            for (outcome_label,from_label,to_label) in internal_edges:
-
-                from_path = '/'.join([self._path, from_label])
-
-                if show_all \
-                        or to_label != 'None'\
-                        or from_label not in has_explicit_transitions \
-                        or (outcome_label == from_label) \
-                        or from_path in containers:
-                    # Set the implicit target of this outcome
-                    if to_label == 'None':
-                        to_label = outcome_label
-
-                    to_path = '/'.join([self._path, to_label])
-
-                    edge_attrs = {
-                            'URL':':'.join([from_path,outcome_label,to_path]),
-                            'fontsize':'12',
-                            'label':'',
-                            'xlabel':'\\n'.join(label_wrapper.wrap(outcome_label))}
-                    edge_attrs['style'] = 'setlinewidth(2)'
-
-                    # Hide implicit
-                    #if not show_all and to_label == outcome_label:
-                    #    edge_attrs['style'] += ',invis'
-
-                    from_key = '"%s"' % from_path
-                    if from_path in containers:
-                        if max_depth == -1 or depth+1 <= max_depth:
-                            from_key = '"%s:%s"' % ( from_path, outcome_label)
-                        else:
-                            edge_attrs['ltail'] = 'cluster_'+from_path
-                            from_path = '/'.join([from_path,'__proxy__'])
-                            from_key = '"%s"' % ( from_path )
-
-                    to_key = ''
-                    # TODO
-                    # if to_label in self._container_outcomes:
-                    if False and to_label in self._container_outcomes:
-                        to_key = '"%s:%s"' % (self._path,to_label)
-                        edge_attrs['color'] = '#00000055'# '#780006'
-                    else:
-                        if to_path in containers:
-                            edge_attrs['lhead'] = 'cluster_'+to_path
-                            to_path = '/'.join([to_path,'__proxy__'])
-                        to_key = '"%s"' % to_path
-
-                    dotstr += '%s -> %s %s;\n' % (
-                            from_key, to_key, attr_string(edge_attrs))
-
         dotstr += '}\n'
         return dotstr
 
