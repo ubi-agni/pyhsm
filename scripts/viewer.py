@@ -275,12 +275,10 @@ class ContainerNode(object):
                     # Check if the child is active
                     child_color = active_color
                     child_fillcolor = active_fillcolor
-                    child_linewidth = 5
-                elif child_label in self._initial_states:
-                    # Initial style
-                    #child_fillcolor = initial_fillcolor
-                    child_color = initial_color
                     child_linewidth = 2
+                if child_label in self._initial_states:
+                    # Initial style
+                    child_linewidth = 4
 
                 # Check if the child is selected
                 if child_path in selected_paths:
