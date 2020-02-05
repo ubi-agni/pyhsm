@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import threading, logging, time, rospy
+import threading, logging, time, rospy, sys
 
 from hsm import State, Container, StateMachine, Event
 from hsm.introspection import IntrospectionServer
@@ -93,7 +93,8 @@ class Oven(StateMachine):
 
 
 if __name__ == '__main__':
-    rospy.init_node('oven')
+    prefix = sys.argv[1] if len(sys.argv) > 1 else ''
+    rospy.init_node('oven' + prefix)
 
     # enable logging
     logger = logging.getLogger("hsm")
@@ -101,7 +102,7 @@ if __name__ == '__main__':
     logger.addHandler(logging.StreamHandler())
 
     oven = Oven()
-    sis = IntrospectionServer('hsm_introspection', oven, '')
+    sis = IntrospectionServer('hsm' + prefix, oven, prefix)
     sis.start()
     raw_input("Press a key to quit")
     sis.stop()
