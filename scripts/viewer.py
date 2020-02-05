@@ -47,9 +47,9 @@ import wx
 import wx.richtext
 import textwrap
 
-from smach_viewer import xdot
 import pyhsm_msgs.msg as msgs
 import hsm.introspection
+from hsm.viewer import xdot
 
 ### Helper Functions
 def graph_attr_string(attrs):
@@ -402,7 +402,7 @@ class HsmViewerFrame(wx.Frame):
         wx.Frame.__init__(self, None, -1, "HSM Viewer", size=(720,480))
 
         # Directory for loading images relative to this file
-        img_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'img', '')
+        img_dir = os.path.join(os.path.dirname(os.path.realpath(hsm.viewer.__file__)), 'img', '')
 
         # Create graph
         self._containers = {}
