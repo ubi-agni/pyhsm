@@ -763,6 +763,8 @@ class HsmViewerFrame(wx.Frame):
             # Update the graph
             self._structure_changed = True
             self._needs_zoom = True  # TODO: Make it so you can disable this
+            self._needs_graph_update = True
+            self._needs_tree_update = True
             self._update_cond.notify_all()
 
         # After first structure message, when structure tree was built, create status subscriber
@@ -907,6 +909,8 @@ class HsmViewerFrame(wx.Frame):
                 rospy.logwarn("unknown state: " + path)
 
             if needs_update:
+                self._needs_graph_update = True
+                self._needs_tree_update = True
                 self._update_cond.notify_all()
 
     def _update_parents(self, path, set_active):
