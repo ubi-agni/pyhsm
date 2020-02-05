@@ -91,9 +91,8 @@ class ContainerNode(object):
     graph once it's been drawn.
     """
 
-    def __init__(self, server_name, msg, prefix, children):
+    def __init__(self, msg, prefix, children):
         # Store path info
-        self._server_name = server_name
         if prefix and prefix[-1] != '/':
             prefix += '/'
         self._path = prefix + msg.path
@@ -757,15 +756,11 @@ class HsmViewerFrame(wx.Frame):
         rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
 
         with self._update_cond:
-            self._build_container_tree(msg, server_name)
-            transition_pub = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
-                                             String, queue_size=1)
-            if msg.states:
-                # We take the path of the first state message as that is the
-                # root of the new tree. We can do this because we know that our
-                # ``msg_builder`` module creates the tree in pre-order.
-                root_path = msg.states[0].path
-                self._transition_pubs[root_path] = transition_pub
+            root = self._build_container_tree(msg)
+            if root is not None:
+                self._transition_pubs[root._path] = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
+                                                                    String, queue_size=1)
+                self._top_containers[root._path] = root
 
             # Update the graph
             self._structure_changed = True
@@ -782,7 +777,7 @@ class HsmViewerFrame(wx.Frame):
                 self._update_cond.notify_all()
             rospy.sleep(0.2)
 
-    def _build_container_tree(self, msg, server_name):
+    def _build_container_tree(self, msg):
         """Build the structural tree of ``ContainerNode``s from the given
         structure ``msg``.
         """
@@ -793,6 +788,8 @@ class HsmViewerFrame(wx.Frame):
 
         # Mapping from parent paths to list of child labels
         children_of = {}
+
+        container = None
 
         # We go through the states in reverse as we create the tree from the
         # leaves up to the root. We can do this because we know that our
@@ -812,23 +809,15 @@ class HsmViewerFrame(wx.Frame):
             children_of[parent_path].append(label)
 
             # Create a new container
-            container = ContainerNode(server_name,
-                                      state_msg,
-                                      prefix,
-                                      children_of.get(path, []))
+            container = ContainerNode(state_msg, prefix, children_of.get(path, []))
             self._containers[path] = container
-
-            # Store this as a top container if it has no parent
-            if not parent_path:
-                self._top_containers[path] = container
-                # Notify if we have our first top container.
-                # TODO This is a pretty bad check; what if top containers are removed?
-                if len(self._top_containers) == 1:
-                    self._update_cond.notify_all()
 
             # Append paths to selector
             self.path_combo.Append(path)
             self.path_input.Append(path)
+
+        # return root container (the one created last)
+        return container
 
     def _status_msg_update(self, msg):
         """Process status messages."""
