@@ -782,7 +782,7 @@ class HsmViewerFrame(wx.Frame):
         children_of = {}
 
         # Store paths and labels to be able to reverse them later.
-        paths_labels = []
+        path_labels = []
 
         container = None
 
@@ -795,7 +795,7 @@ class HsmViewerFrame(wx.Frame):
             pathsplit = path.split('/')
             parent_path = '/'.join(pathsplit[0:-1])
             label = pathsplit[-1]
-            paths_labels.append((path, label))
+            path_labels.append((path, label))
 
             rospy.logdebug("CONSTRUCTING: " + path)
 
@@ -809,16 +809,14 @@ class HsmViewerFrame(wx.Frame):
             self._containers[path] = container
 
         # Here we reverse once again, going from root to leaf nodes; once again in pre-order.
-        paths_labels.reverse()
-        self._fill_selectors(paths_labels, prefix)
+        path_labels.reverse()
+        self._fill_selectors(path_labels, prefix)
 
         # return root container (the one created last)
         return container
 
-    def _fill_selectors(self, paths_labels, prefix):
-        """Fill the path selectors with the paths and labels contained as
-        tuples in the given list.
-        """
+    def _fill_selectors(self, path_labels, prefix):
+        """Fill the path selectors with the paths and labels contained as tuples in the given list."""
         # Store the previous parent's path and the corresponding nodes of the ``TreeComboBox``es
         # as a tuple (path, node of ``self.path_combo``, node of ``self.path_input``).
         prev_parents = []
@@ -826,7 +824,7 @@ class HsmViewerFrame(wx.Frame):
         pi_prefix_root = self.path_input.FindItemWithClientData(prefix)
 
         # Append paths to selectors
-        for (path, label) in paths_labels:
+        for (path, label) in path_labels:
             pc_parent, pi_parent = self._selectors_get_parents(label,
                                                                prev_parents,
                                                                pc_prefix_root,
