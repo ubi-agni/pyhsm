@@ -103,9 +103,6 @@ class ContainerNode(object):
 
         self._children = children
 
-        # TODO These seem to be transition targets
-        # self._container_outcomes = msg.container_outcomes
-
         # Status
         # TODO not as list
         self._initial_states = [msg.initial]
@@ -757,7 +754,7 @@ class HsmViewerFrame(wx.Frame):
         if not self._keep_running:
             return
 
-        rospy.logdebug("STRUCTURE MSG WITH PREFIX: "+msg.prefix)
+        rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
 
         with self._update_cond:
             self._build_container_tree(msg, server_name)
@@ -807,7 +804,7 @@ class HsmViewerFrame(wx.Frame):
             parent_path = '/'.join(pathsplit[0:-1])
             label = pathsplit[-1]
 
-            rospy.logdebug("CONSTRUCTING: "+path)
+            rospy.logdebug("CONSTRUCTING: " + path)
 
             # Add to children of parent
             if parent_path not in children_of:
