@@ -156,13 +156,14 @@ class ContainerNode(object):
 
         dotstr = 'subgraph "cluster_%s" {\n' % (self._path)
         if depth == 0:
-            #attrs['style'] = 'filled,rounded'
-            attrs['color'] = '#00000000'
-            attrs['fillcolor'] = '#0000000F'
+            attrs['style'] = 'filled,setlinewidth(2),rounded'
+            attrs['color'] = '#000000FF'
+            attrs['fillcolor'] = '#00000010'
         #attrs['rank'] = 'max'
 
         #,'succeeded','aborted','preempted'attrs['label'] = self._label
-        dotstr += graph_attr_string(attrs)
+        if attrs:
+            dotstr += graph_attr_string(attrs)
 
         # Add start/terimate target
         proxy_attrs = {
