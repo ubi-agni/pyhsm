@@ -830,61 +830,6 @@ class HsmViewerFrame(wx.Frame):
             self.path_combo.Append(path)
             self.path_input.Append(path)
 
-    # TODO Rework when we actually get updates
-    def _structure_msg_update(self, msg, server_name):
-        """Update the structure of the HSM plan (re-generate the dotcode)."""
-
-        # Just return if we're shutting down
-        if not self._keep_running:
-            return
-
-        # Get the node path
-        path = msg.path
-        pathsplit = path.split('/')
-        parent_path = '/'.join(pathsplit[0:-1])
-
-        rospy.logdebug("STRUCTURE MSG: "+path)
-        rospy.logdebug("CONTAINERS: "+str(self._containers.keys()))
-
-        # Initialize redraw flag
-        needs_redraw = False
-
-        with self._update_cond:
-            if path in self._containers:
-                rospy.logdebug("UPDATING: "+path)
-
-                # Update the structure of this known container
-                # We will never call this as the tree will be regenerated entirely
-                needs_redraw = self._containers[path].update_structure(msg)
-            else:
-                rospy.logdebug("CONSTRUCTING: "+path)
-
-                # Create a new container
-                container = ContainerNode(server_name, msg)
-                self._containers[path] = container
-
-                # Store this as a top container if it has no parent
-                if parent_path == '':
-                    self._top_containers[path] = container
-                    # Notify if we have our first top container.
-                    # TODO This is a pretty bad check; what if top containers are removed?
-                    if len(self._top_containers) == 1 and not self._containers:
-                        self._update_cond.notify_all()
-
-                # Append paths to selector
-                self.path_combo.Append(path)
-                self.path_input.Append(path)
-
-                # We need to redraw thhe graph if this container's parent is already known
-                if parent_path in self._containers:
-                    needs_redraw = True
-
-            # Update the graph if necessary
-            if needs_redraw:
-                self._structure_changed = True
-                self._needs_zoom = True # TODO: Make it so you can disable this
-                self._update_cond.notify_all()
-
     def _status_msg_update(self, msg):
         """Process status messages."""
 
