@@ -637,7 +637,7 @@ class HsmViewerFrame(wx.Frame):
 
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
-        self._path = self.path_filter_combo.GetValue()
+        self._path = self.path_filter_combo.GetValue() or '/'
         self._needs_zoom = True
         self.update_graph()
 
