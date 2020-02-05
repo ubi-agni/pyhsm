@@ -1033,7 +1033,8 @@ class HsmViewerFrame(wx.Frame):
                         queue_size=50)
 
             # Don't update the list too often
-            rospy.sleep(1.0)
+            with self._update_cond:
+                self._update_cond.wait(1.0)
 
     def ShowControlsDialog(self,event):
         dial = wx.MessageDialog(None,
