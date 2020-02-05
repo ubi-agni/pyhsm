@@ -114,7 +114,11 @@ class ContainerNode(object):
 
         # Status
         # TODO not as list
-        self._initial_states = [msg.initial]
+        if msg.initial is not None:
+            self._initial_states = [msg.initial]
+        else:
+            self._initial_states = []
+
         self._is_active = False
         # Labels of active children
         self._active_states = []
@@ -512,7 +516,7 @@ class HsmViewerFrame(wx.Frame):
                                        tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
         self.path_combo.Bind(wx.EVT_TEXT, self.selection_changed)
         # This will be hidden but is necessary to have multiple 'root' nodes.
-        self.path_combo.AddRoot('', data=wx.TreeItemData(''))
+        self.path_combo.AddRoot('/', data=wx.TreeItemData('/'))
         main_toolbar.AddControl(self.path_combo)
 
         # Add initial state button
@@ -756,8 +760,10 @@ class HsmViewerFrame(wx.Frame):
         rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
 
         with self._update_cond:
+            prefix_leaf = self._build_prefix_tree(msg.prefix)
             root = self._build_container_tree(msg)
             if root is not None:
+                prefix_leaf._children = [root._label]
                 self._transition_pubs[root._path] = rospy.Publisher(
                     server_name + hsm.introspection.TRANSITION_TOPIC,
                     String,
@@ -777,6 +783,36 @@ class HsmViewerFrame(wx.Frame):
             msgs.HsmCurrentState,
             callback=self._status_msg_update,
             queue_size=50)
+
+    def _build_prefix_tree(self, prefix):
+        """Build the structural tree of empty ``ContainerNode``s up to the given prefix
+        and return the sole leaf of that tree.
+        """
+        split_prefix = prefix.split('/')
+
+        # Store paths and labels to be able to reverse them later.
+        path_labels = []
+
+        leaf = None
+        children = []
+        for i in range(len(split_prefix) - 1, -1, -1):
+            path = '/'.join(split_prefix[:i + 1])
+            label = split_prefix[i]
+            path_labels.append((path, label))
+
+            rospy.logdebug("CONSTRUCTING: " + path)
+            msg = msgs.HsmState(path=path, initial=None)
+            container = ContainerNode(msg, prefix='', children=children)
+            self._containers[path] = container
+
+            if leaf is None:
+                leaf = container
+            children = [container]
+
+        # Here we reverse once again, now going from root to leaf nodes.
+        path_labels.reverse()
+        self._fill_selectors(path_labels, '')
+        return leaf
 
     def _build_container_tree(self, msg):
         """Build the structural tree of ``ContainerNode``s from the given
@@ -819,7 +855,8 @@ class HsmViewerFrame(wx.Frame):
 
         # Here we reverse once again, now going from root to leaf nodes; once again in pre-order.
         path_labels.reverse()
-        self._fill_selectors(path_labels, prefix)
+        # We explicitly want the message's prefix here without the possibly appended '/'.
+        self._fill_selectors(path_labels, msg.prefix)
 
         # return root container (the one created last)
         return container
