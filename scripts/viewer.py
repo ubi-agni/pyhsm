@@ -85,10 +85,10 @@ def hex2t(color_str):
 
 
 ### Helper Structs
-# For searching: class _PrevParent(tuple):
-_PrevParent = collections.namedtuple('_PrevParent', ('path',
-                                                     'path_filter_combo_node',
-                                                     'path_combo_node'))
+# For searching: class _ComboItem(tuple):
+_ComboItem = collections.namedtuple('_ComboItem', ('path',
+                                                   'path_filter_combo_node',
+                                                   'path_combo_node'))
 
 
 class ContainerNode(object):
@@ -620,20 +620,22 @@ class HsmViewerFrame(wx.Frame):
 
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
-        if self._selected_paths:
-            state_path = self._selected_paths[0]
-            parent_path = state_path
-            prev_parent_path = ''
-            # Search for the root path of the state machine containing the selected path.
-            while (parent_path not in self._transition_pubs
-                   and parent_path != prev_parent_path):
-                prev_parent_path = parent_path
-                parent_path = get_parent_path(parent_path)
+        if not self._selected_paths:
+            return
 
-            transition_pub = self._transition_pubs[parent_path]
-            transition_msg = String()
-            transition_msg.data = state_path
-            transition_pub.publish(transition_msg)
+        state_path = self._selected_paths[0]
+        parent_path = state_path
+        prev_parent_path = ''
+        # Search for the root path of the state machine containing the selected path.
+        while (parent_path not in self._transition_pubs
+               and parent_path != prev_parent_path):
+            prev_parent_path = parent_path
+            parent_path = get_parent_path(parent_path)
+
+        transition_pub = self._transition_pubs[parent_path]
+        transition_msg = String()
+        transition_msg.data = state_path
+        transition_pub.publish(transition_msg)
 
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
@@ -756,8 +758,10 @@ class HsmViewerFrame(wx.Frame):
         with self._update_cond:
             root = self._build_container_tree(msg)
             if root is not None:
-                self._transition_pubs[root._path] = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
-                                                                    String, queue_size=1)
+                self._transition_pubs[root._path] = rospy.Publisher(
+                    server_name + hsm.introspection.TRANSITION_TOPIC,
+                    String,
+                    queue_size=1)
                 self._top_containers[root._path] = root
 
             # Update the graph
@@ -798,7 +802,7 @@ class HsmViewerFrame(wx.Frame):
             # Prefix has the '/' appended already.
             path = prefix + state_msg.path
             pathsplit = path.split('/')
-            parent_path = '/'.join(pathsplit[0:-1])
+            parent_path = '/'.join(pathsplit[:-1])
             label = pathsplit[-1]
             path_labels.append((path, label))
 
@@ -813,7 +817,7 @@ class HsmViewerFrame(wx.Frame):
             container = ContainerNode(state_msg, prefix, children_of.get(path, []))
             self._containers[path] = container
 
-        # Here we reverse once again, going from root to leaf nodes; once again in pre-order.
+        # Here we reverse once again, now going from root to leaf nodes; once again in pre-order.
         path_labels.reverse()
         self._fill_selectors(path_labels, prefix)
 
@@ -844,9 +848,9 @@ class HsmViewerFrame(wx.Frame):
             # TODO This does not work for some reason. ``ExpandAll`` calls below.
             # self.path_filter_combo.Expand(pfc_parent)
             # self.path_combo.Expand(pc_parent)
-            prev_parent = _PrevParent(path=path,
-                                      path_filter_combo_node=pfc_parent,
-                                      path_combo_node=pc_parent)
+            prev_parent = _ComboItem(path=path,
+                                     path_filter_combo_node=pfc_parent,
+                                     path_combo_node=pc_parent)
             prev_parents.append(prev_parent)
 
         self.path_filter_combo.ExpandAll()
@@ -882,7 +886,7 @@ class HsmViewerFrame(wx.Frame):
         if not self._keep_running:
             return
 
-        # Get the path to the updating conainer
+        # Get the path to the updating container
         path = msg.path
         rospy.logdebug("STATUS MSG: "+path)
 
