@@ -94,7 +94,7 @@ class Oven(StateMachine):
 
 if __name__ == '__main__':
     prefix = sys.argv[1] if len(sys.argv) > 1 else ''
-    rospy.init_node('oven' + prefix)
+    rospy.init_node('oven' + prefix, anonymous=True)
 
     # enable logging
     logger = logging.getLogger("hsm")
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     logger.addHandler(logging.StreamHandler())
 
     oven = Oven()
-    sis = IntrospectionServer('hsm' + prefix, oven, prefix)
+    sis = IntrospectionServer(rospy.get_name(), oven, prefix)
     sis.start()
     raw_input("Press a key to quit")
     sis.stop()
