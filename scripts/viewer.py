@@ -989,12 +989,24 @@ class HsmViewerFrame(wx.Frame):
 
                 # Get the containers to update
                 containers_to_update = {}
-                if self._path in self._containers:
-                    # Some non-root path
-                    containers_to_update = {self._path:self._containers[self._path]}
+                top_container = self._find_top_container_for_path(self._path)
+                if top_container is not None:
+                    # Some non-root and non-prefix path
+                    containers_to_update = {self._path: self._containers[self._path]}
                 elif self._path == '/':
                     # Root path
                     containers_to_update = self._top_containers
+                elif self._path in self._containers:
+                    # We have a valid container that is above top containers (a prefix container)
+                    # Find all top containers below and update those
+                    paths = [self._path]
+                    while paths:
+                        path = paths.pop()
+                        if path not in self._top_containers:
+                            container = self._containers[path]
+                            paths.extend((path + '/' + label for label in container._children))
+                        else:
+                            containers_to_update[path] = self._top_containers[path]
 
                 # Check if we need to re-generate the dotcode (if the structure changed)
                 # TODO: needs_zoom is a misnomer
