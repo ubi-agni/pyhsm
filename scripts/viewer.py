@@ -770,7 +770,6 @@ class HsmViewerFrame(wx.Frame):
         and return the sole leaf of that tree.
         """
         split_prefix = prefix.split('/')
-
         # Store paths and labels to be able to reverse them later.
         path_labels = []
 
@@ -778,6 +777,8 @@ class HsmViewerFrame(wx.Frame):
         children = []
         for i in range(len(split_prefix) - 1, -1, -1):
             path = '/'.join(split_prefix[:i + 1])
+            if path in self._containers:
+                return self._containers[path]
             label = split_prefix[i]
             path_labels.append((path, label))
 
@@ -818,6 +819,9 @@ class HsmViewerFrame(wx.Frame):
         for state_msg in msg.states[::-1]:
             # Prefix has the '/' appended already.
             path = prefix + state_msg.path
+            if path in self._containers:
+                # Skip containers we already know; we do not update directly.
+                continue
             pathsplit = path.split('/')
             parent_path = '/'.join(pathsplit[:-1])
             label = pathsplit[-1]
@@ -834,10 +838,11 @@ class HsmViewerFrame(wx.Frame):
             container = ContainerNode(state_msg, prefix, children_of.get(path, []))
             self._containers[path] = container
 
-        # Here we reverse once again, now going from root to leaf nodes; once again in pre-order.
-        path_labels.reverse()
-        # We explicitly want the message's prefix here without the possibly appended '/'.
-        self._fill_selectors(path_labels, msg.prefix)
+        if container is not None:
+            # Here we reverse once again, now going from root to leaf nodes; once again in pre-order.
+            path_labels.reverse()
+            # We explicitly want the message's prefix here without the possibly appended '/'.
+            self._fill_selectors(path_labels, msg.prefix)
 
         # return root container (the one created last)
         return container
