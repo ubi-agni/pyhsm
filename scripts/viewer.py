@@ -421,6 +421,7 @@ class HsmViewerFrame(wx.Frame):
         # Create graph
         self._containers = {}
         self._top_containers = {}
+        # Mapping from full paths to tree items
         self._tree_nodes = {}
         self._update_cond = threading.Condition()
         self._needs_graph_update = False
@@ -545,11 +546,12 @@ class HsmViewerFrame(wx.Frame):
         gv_vbox.Add(self.widget, 1, wx.EXPAND)
 
         # Create tree view widget
-        self.tree_view = wx.TreeCtrl(self, -1, style=wx.TR_HAS_BUTTONS)
+        self.tree_view = wx.TreeCtrl(self, -1, style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
         self.tree_view.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
         self.tree_view.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
         # Do not show tree view by default as we want the graph view.
         self.tree_view.Hide()
+        self.tree_view.AddRoot('/')
 
         self.vbox.Add(main_toolbar, 0, wx.EXPAND)
         self.vbox.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
@@ -1064,20 +1066,37 @@ class HsmViewerFrame(wx.Frame):
                 self._needs_tree_update = False
 
                 for path,tc in self._top_containers.iteritems():
-                    self.add_to_tree(path, None)
+                    prefix_leaf = self.add_prefix_tree(path)
+                    modified = self.add_to_tree(path, prefix_leaf)
+                    if modified:
+                        self.tree_view.Expand(prefix_leaf)
                     self.update_tree_status(tc)
 
+    def add_prefix_tree(self, path):
+        """Add the individual labels in the full path to the tree and return the leaf node."""
+        if path in self._tree_nodes:
+            return self._tree_nodes[path]
+
+        parents = [self.tree_view.GetRootItem()]
+        split_path = path.split('/')[:-1]
+
+        for i, label in enumerate(split_path):
+            local_path = '/'.join(split_path[:i + 1])
+            parents.append(self.tree_view.AppendItem(parents[-1], label))
+            self._tree_nodes[local_path] = parents[-1]
+
+        # Cannot expand hidden root
+        for parent in parents[1:]:
+            self.tree_view.Expand(parent)
+        return parents[-1]
 
     def add_to_tree(self, path, parent):
         """Add a path to the tree view."""
         modified = False
-        container = self._tree_nodes.get(path, None)
-        if container is None:
-            if parent is None:
-                container = self.tree_view.AddRoot(get_label(path))
-            else:
-                container = self.tree_view.AppendItem(parent, get_label(path))
-            self._tree_nodes[path] = container
+        container_item = self._tree_nodes.get(path, None)
+        if container_item is None:
+            container_item = self.tree_view.AppendItem(parent, get_label(path))
+            self._tree_nodes[path] = container_item
             modified = True
 
         # Add children to tree
@@ -1086,9 +1105,9 @@ class HsmViewerFrame(wx.Frame):
         added_children = False
         for label in children:
             child_path = '/'.join([path,label])
-            added_children |= self.add_to_tree(child_path, container)
+            added_children |= self.add_to_tree(child_path, container_item)
             if added_children:
-                self.tree_view.Expand(container)
+                self.tree_view.Expand(container_item)
 
         return modified | added_children
 
@@ -1169,7 +1188,7 @@ class HsmViewerFrame(wx.Frame):
             item = self.tree_view.GetItemParent(item)
 
         # Update the selection dropdown
-        self.path_combo.SetValue('/'.join(reversed(paths)))
+        self.path_combo.SetValue('/'.join(reversed(paths[:-1])))
         wx.PostEvent(
             self.path_combo.GetEventHandler(),
             wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_combo.GetId()))
