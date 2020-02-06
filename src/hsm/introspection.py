@@ -298,22 +298,29 @@ class IntrospectionServer():
         self._active_path = self._get_full_path(to_state)
         self._publish_status()
 
-    @staticmethod
-    def _get_full_path(state):
+    def _get_full_path(self, state):
         """Return the full path up to the given state."""
         names = []
         while state is not None:
             names.append(state.name)
             state = state.parent
+        if self._path:
+            names.append(self._path)
 
         # As we walked up from a child, we need to reverse the path's parts.
         names.reverse()
         return '/'.join(names)
 
     def _transition_cmd_cb(self, msg):
+        # Remove prefix from msg path (as the state machine does not know about it)
+        if self._path:
+            path = msg.data[len(self._path) + 1:]
+        else:
+            path = msg.data
+
         to_state = self._machine
         try:
-            for k in msg.data.split('/')[1:]:
+            for k in path.split('/')[1:]:
                 to_state = to_state[k]
         except:
             rospy.logerr('Unknown state {}'.format(msg.data))

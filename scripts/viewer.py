@@ -37,6 +37,7 @@ import rospkg
 
 from std_msgs.msg import String
 
+import collections
 import sys
 import os
 import threading
@@ -50,6 +51,7 @@ import textwrap
 import pyhsm_msgs.msg as msgs
 import hsm.introspection
 from hsm.viewer import xdot
+from hsm.viewer.tree_combo_box import TreeComboBox
 
 ### Helper Functions
 def graph_attr_string(attrs):
@@ -81,6 +83,14 @@ def hex2t(color_str):
     color_tuple = [int(color_str[i:i+2],16)/255.0    for i in range(1,len(color_str),2)]
     return color_tuple
 
+
+### Helper Structs
+# For searching: class _ComboItem(tuple):
+_ComboItem = collections.namedtuple('_ComboItem', ('path',
+                                                   'path_filter_combo_node',
+                                                   'path_combo_node'))
+
+
 class ContainerNode(object):
     """
     This class represents a given container in a running HSM system.
@@ -104,7 +114,11 @@ class ContainerNode(object):
 
         # Status
         # TODO not as list
-        self._initial_states = [msg.initial]
+        if msg.initial is not None:
+            self._initial_states = [msg.initial]
+        else:
+            self._initial_states = []
+
         self._is_active = False
         # Labels of active children
         self._active_states = []
@@ -146,13 +160,14 @@ class ContainerNode(object):
 
         dotstr = 'subgraph "cluster_%s" {\n' % (self._path)
         if depth == 0:
-            #attrs['style'] = 'filled,rounded'
-            attrs['color'] = '#00000000'
-            attrs['fillcolor'] = '#0000000F'
+            attrs['style'] = 'filled,setlinewidth(2),rounded'
+            attrs['color'] = '#000000FF'
+            attrs['fillcolor'] = '#00000010'
         #attrs['rank'] = 'max'
 
         #,'succeeded','aborted','preempted'attrs['label'] = self._label
-        dotstr += graph_attr_string(attrs)
+        if attrs:
+            dotstr += graph_attr_string(attrs)
 
         # Add start/terimate target
         proxy_attrs = {
@@ -224,68 +239,6 @@ class ContainerNode(object):
                     child_attrs['URL'] = child_path
                     dotstr += '"%s" %s;\n' % (child_path, attr_string(child_attrs))
 
-            # Iterate over edges
-            internal_edges = []
-
-            # Add edge from container label to initial state
-            internal_edges += [('','__proxy__',initial_child) for initial_child in self._initial_states]
-
-            has_explicit_transitions = []
-            for (outcome_label,from_label,to_label) in internal_edges:
-                if to_label != 'None' or outcome_label == to_label:
-                    has_explicit_transitions.append(from_label)
-
-            # Draw internal edges
-            for (outcome_label,from_label,to_label) in internal_edges:
-
-                from_path = '/'.join([self._path, from_label])
-
-                if show_all \
-                        or to_label != 'None'\
-                        or from_label not in has_explicit_transitions \
-                        or (outcome_label == from_label) \
-                        or from_path in containers:
-                    # Set the implicit target of this outcome
-                    if to_label == 'None':
-                        to_label = outcome_label
-
-                    to_path = '/'.join([self._path, to_label])
-
-                    edge_attrs = {
-                            'URL':':'.join([from_path,outcome_label,to_path]),
-                            'fontsize':'12',
-                            'label':'',
-                            'xlabel':'\\n'.join(label_wrapper.wrap(outcome_label))}
-                    edge_attrs['style'] = 'setlinewidth(2)'
-
-                    # Hide implicit
-                    #if not show_all and to_label == outcome_label:
-                    #    edge_attrs['style'] += ',invis'
-
-                    from_key = '"%s"' % from_path
-                    if from_path in containers:
-                        if max_depth == -1 or depth+1 <= max_depth:
-                            from_key = '"%s:%s"' % ( from_path, outcome_label)
-                        else:
-                            edge_attrs['ltail'] = 'cluster_'+from_path
-                            from_path = '/'.join([from_path,'__proxy__'])
-                            from_key = '"%s"' % ( from_path )
-
-                    to_key = ''
-                    # TODO
-                    # if to_label in self._container_outcomes:
-                    if False and to_label in self._container_outcomes:
-                        to_key = '"%s:%s"' % (self._path,to_label)
-                        edge_attrs['color'] = '#00000055'# '#780006'
-                    else:
-                        if to_path in containers:
-                            edge_attrs['lhead'] = 'cluster_'+to_path
-                            to_path = '/'.join([to_path,'__proxy__'])
-                        to_key = '"%s"' % to_path
-
-                    dotstr += '%s -> %s %s;\n' % (
-                            from_key, to_key, attr_string(edge_attrs))
-
         dotstr += '}\n'
         return dotstr
 
@@ -336,12 +289,10 @@ class ContainerNode(object):
                     # Check if the child is active
                     child_color = active_color
                     child_fillcolor = active_fillcolor
-                    child_linewidth = 5
-                elif child_label in self._initial_states:
-                    # Initial style
-                    #child_fillcolor = initial_fillcolor
-                    child_color = initial_color
                     child_linewidth = 2
+                if child_label in self._initial_states:
+                    # Initial style
+                    child_linewidth = 4
 
                 # Check if the child is selected
                 if child_path in selected_paths:
@@ -356,13 +307,8 @@ class ContainerNode(object):
                         elif 0 and child_label in self._initial_states:
                             child_fillcolor[3] = 0.25
                         else:
-                            if max_depth > 0:
-                                v = 1.0-0.25*((depth+1)/float(max_depth))
-                            else:
-                                v = 0.85
-                            child_fillcolor = [v,v,v,1.0]
+                            child_fillcolor = [0.98, 0.98, 0.98, 1.0]
 
-                        
                         for shape in subgraph_shapes['cluster_'+child_path]:
                             pen = shape.pen
                             if len(pen.color) > 3:
@@ -407,6 +353,7 @@ class HsmViewerFrame(wx.Frame):
         # Create graph
         self._containers = {}
         self._top_containers = {}
+        # Mapping from full paths to tree items
         self._tree_nodes = {}
         self._update_cond = threading.Condition()
         self._needs_graph_update = False
@@ -429,11 +376,12 @@ class HsmViewerFrame(wx.Frame):
         gv_toolbar.AddControl(wx.StaticText(gv_toolbar, -1, 'Filter: '))
 
         # Path list
-        self.path_combo = wx.ComboBox(gv_toolbar, -1, style=wx.CB_DROPDOWN)
-        self.path_combo .Bind(wx.EVT_COMBOBOX, self.set_path)
-        self.path_combo.Append('/')
-        self.path_combo.SetValue('/')
-        gv_toolbar.AddControl(self.path_combo)
+        self.path_filter_combo = TreeComboBox(gv_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
+                                              tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
+        self.path_filter_combo.Bind(wx.EVT_TEXT, self.set_path)
+        self.path_filter_combo.AddRoot('/', data=wx.TreeItemData('/'))
+        self.path_filter_combo.SetValue('/')
+        gv_toolbar.AddControl(self.path_filter_combo)
 
         # Depth spinner
         self.depth_spinner = wx.SpinCtrl(gv_toolbar, -1,
@@ -497,9 +445,12 @@ class HsmViewerFrame(wx.Frame):
         main_toolbar.AddControl(self._toggle_view_button)
         main_toolbar.AddControl(wx.StaticText(main_toolbar, -1, '  Current Path: '))
 
-        self.path_input = wx.ComboBox(main_toolbar, -1, style=wx.CB_DROPDOWN)
-        self.path_input.Bind(wx.EVT_COMBOBOX, self.selection_changed)
-        main_toolbar.AddControl(self.path_input)
+        self.path_combo = TreeComboBox(main_toolbar, -1, size=(250, -1), style=wx.CB_DROPDOWN,
+                                       tree_style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
+        self.path_combo.Bind(wx.EVT_TEXT, self.selection_changed)
+        # This will be hidden but is necessary to have multiple 'root' nodes.
+        self.path_combo.AddRoot('/', data=wx.TreeItemData('/'))
+        main_toolbar.AddControl(self.path_combo)
 
         # Add initial state button
         # self.is_button = wx.Button(self.ud_win,-1,"Set as Initial State")
@@ -527,11 +478,12 @@ class HsmViewerFrame(wx.Frame):
         gv_vbox.Add(self.widget, 1, wx.EXPAND)
 
         # Create tree view widget
-        self.tree_view = wx.TreeCtrl(self, -1, style=wx.TR_HAS_BUTTONS)
+        self.tree_view = wx.TreeCtrl(self, -1, style=wx.TR_HAS_BUTTONS | wx.TR_HIDE_ROOT)
         self.tree_view.Bind(wx.EVT_TREE_SEL_CHANGED, self.OnTreeSelectionChanged)
         self.tree_view.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_trigger_transition)
         # Do not show tree view by default as we want the graph view.
         self.tree_view.Hide()
+        self.tree_view.AddRoot('/')
 
         self.vbox.Add(main_toolbar, 0, wx.EXPAND)
         self.vbox.Add(self.graph_view, 1, wx.EXPAND | wx.ALL, 4)
@@ -606,31 +558,30 @@ class HsmViewerFrame(wx.Frame):
 
     def on_trigger_transition(self, event):
         """Event: Change the current state of the server."""
-        if self._selected_paths:
-            state_path = self._selected_paths[0]
-            parent_path = state_path
-            prev_parent_path = ''
-            # Search for the root path of the state machine containing the selected path.
-            while (parent_path not in self._transition_pubs
-                   and parent_path != prev_parent_path):
-                prev_parent_path = parent_path
-                parent_path = get_parent_path(parent_path)
+        if not self._selected_paths:
+            return
 
-            transition_pub = self._transition_pubs[parent_path]
-            transition_msg = String()
-            transition_msg.data = state_path
-            transition_pub.publish(transition_msg)
+        state_path = self._selected_paths[0]
+        top_container = self._find_top_container_for_path(state_path)
+        if top_container is None:
+            # We were above a top container; no transition possible
+            return
+
+        transition_pub = self._transition_pubs[top_container._path]
+        transition_msg = String()
+        transition_msg.data = state_path
+        transition_pub.publish(transition_msg)
 
     def set_path(self, event):
         """Event: Change the viewable path and update the graph."""
-        self._path = self.path_combo.GetValue()
+        self._path = self.path_filter_combo.GetValue() or '/'
         self._needs_zoom = True
         self.update_graph()
 
     def _set_path(self, path):
         self._path = path
         self._needs_zoom = True
-        self.path_combo.SetValue(path)
+        self.path_filter_combo.SetValue(path)
         self.update_graph()
 
     def set_depth(self, event):
@@ -697,38 +648,20 @@ class HsmViewerFrame(wx.Frame):
         # Left button-up
         if event.LeftDown():
             # Update the selection dropdown
-            self.path_input.SetValue(item.url)
+            self.path_combo.SetValue(item.url)
             wx.PostEvent(
-                    self.path_input.GetEventHandler(),
-                    wx.CommandEvent(wx.wxEVT_COMMAND_COMBOBOX_SELECTED,self.path_input.GetId()))
+                    self.path_combo.GetEventHandler(),
+                    wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_combo.GetId()))
             self.update_graph()
 
     def selection_changed(self, event):
         """Event: Selection dropdown changed."""
-        path_input_str = self.path_input.GetValue()
+        path = self.path_combo.GetValue()
         # Store this item's url as the selected path
-        self._selected_paths = [path_input_str]
+        self._selected_paths = [path]
 
-        # Check the path is non-zero length
-        if len(path_input_str) > 0:
-            # Split the path (state:outcome), and get the state path
-            path = path_input_str.split(':')[0]
-
-            # Get the container corresponding to this path, since userdata is
-            # stored in the containers
-            if path not in self._containers:
-                parent_path = get_parent_path(path)
-            else:
-                parent_path = path
-
-            if parent_path in self._containers:
-                # Enable the initial state button for the selection
-                #self.is_button.Enable()
-                self.tt_button.Enable()
-            else:
-                # Disable the initial state button for this selection
-                #self.is_button.Disable()
-                self.tt_button.Disable()
+        top_container = self._find_top_container_for_path(path)
+        self.tt_button.Enable(top_container is not None)
         self.update_graph()
 
     def _init_structure(self, msg, server_name):
@@ -740,10 +673,14 @@ class HsmViewerFrame(wx.Frame):
         rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
 
         with self._update_cond:
+            prefix_leaf = self._build_prefix_tree(msg.prefix)
             root = self._build_container_tree(msg)
             if root is not None:
-                self._transition_pubs[root._path] = rospy.Publisher(server_name + hsm.introspection.TRANSITION_TOPIC,
-                                                                    String, queue_size=1)
+                prefix_leaf._children = [root._label]
+                self._transition_pubs[root._path] = rospy.Publisher(
+                    server_name + hsm.introspection.TRANSITION_TOPIC,
+                    String,
+                    queue_size=1)
                 self._top_containers[root._path] = root
 
             # Update the graph
@@ -760,6 +697,37 @@ class HsmViewerFrame(wx.Frame):
             callback=self._status_msg_update,
             queue_size=50)
 
+    def _build_prefix_tree(self, prefix):
+        """Build the structural tree of empty ``ContainerNode``s up to the given prefix
+        and return the sole leaf of that tree.
+        """
+        split_prefix = prefix.split('/')
+        # Store paths and labels to be able to reverse them later.
+        path_labels = []
+
+        leaf = None
+        children = []
+        for i in range(len(split_prefix) - 1, -1, -1):
+            path = '/'.join(split_prefix[:i + 1])
+            if path in self._containers:
+                return self._containers[path]
+            label = split_prefix[i]
+            path_labels.append((path, label))
+
+            rospy.logdebug("CONSTRUCTING: " + path)
+            msg = msgs.HsmState(path=path, initial=None)
+            container = ContainerNode(msg, prefix='', children=children)
+            self._containers[path] = container
+
+            if leaf is None:
+                leaf = container
+            children = [container]
+
+        # Here we reverse once again, now going from root to leaf nodes.
+        path_labels.reverse()
+        self._fill_selectors(path_labels, '')
+        return leaf
+
     def _build_container_tree(self, msg):
         """Build the structural tree of ``ContainerNode``s from the given
         structure ``msg``.
@@ -772,6 +740,9 @@ class HsmViewerFrame(wx.Frame):
         # Mapping from parent paths to list of child labels
         children_of = {}
 
+        # Store paths and labels to be able to reverse them later.
+        path_labels = []
+
         container = None
 
         # We go through the states in reverse as we create the tree from the
@@ -780,9 +751,13 @@ class HsmViewerFrame(wx.Frame):
         for state_msg in msg.states[::-1]:
             # Prefix has the '/' appended already.
             path = prefix + state_msg.path
+            if path in self._containers:
+                # Skip containers we already know; we do not update directly.
+                continue
             pathsplit = path.split('/')
-            parent_path = '/'.join(pathsplit[0:-1])
+            parent_path = '/'.join(pathsplit[:-1])
             label = pathsplit[-1]
+            path_labels.append((path, label))
 
             rospy.logdebug("CONSTRUCTING: " + path)
 
@@ -795,12 +770,69 @@ class HsmViewerFrame(wx.Frame):
             container = ContainerNode(state_msg, prefix, children_of.get(path, []))
             self._containers[path] = container
 
-            # Append paths to selector
-            self.path_combo.Append(path)
-            self.path_input.Append(path)
+        if container is not None:
+            # Here we reverse once again, now going from root to leaf nodes; once again in pre-order.
+            path_labels.reverse()
+            # We explicitly want the message's prefix here without the possibly appended '/'.
+            self._fill_selectors(path_labels, msg.prefix)
 
         # return root container (the one created last)
         return container
+
+    def _fill_selectors(self, path_labels, prefix):
+        """Fill the path selectors with the paths and labels contained as
+        tuples in the given list.
+        """
+        # Store the previous parent's path and the corresponding nodes of the ``TreeComboBox``es
+        # as a tuple (path, node of ``self.path_filter_combo``, node of ``self.path_combo``).
+        prev_parents = []
+        pfc_prefix_root = self.path_filter_combo.FindItemWithClientData(prefix)
+        pc_prefix_root = self.path_combo.FindItemWithClientData(prefix)
+
+        # Append paths to selectors
+        for (path, label) in path_labels:
+            pfc_parent, pc_parent = self._selectors_get_parents(label,
+                                                                prev_parents,
+                                                                pfc_prefix_root,
+                                                                pc_prefix_root)
+
+            pfc_parent = self.path_filter_combo.AppendItem(pfc_parent,
+                                                           label,
+                                                           data=wx.TreeItemData(path))
+            pc_parent = self.path_combo.AppendItem(pc_parent, label, data=wx.TreeItemData(path))
+            # TODO This does not work for some reason. ``ExpandAll`` calls below.
+            # self.path_filter_combo.Expand(pfc_parent)
+            # self.path_combo.Expand(pc_parent)
+            prev_parent = _ComboItem(path=path,
+                                     path_filter_combo_node=pfc_parent,
+                                     path_combo_node=pc_parent)
+            prev_parents.append(prev_parent)
+
+        self.path_filter_combo.ExpandAll()
+        self.path_combo.ExpandAll()
+
+    def _selectors_get_parents(self, label, prev_parents,
+                               path_filter_combo_prefix_root, path_combo_prefix_root):
+        """Return the selector items that are parents to a child with the given label.
+        The hierarchically highest node is ``prefix_root`` even if it is not the global root.
+        """
+        # Go up the previous parents until we find the label as a child.
+        while (prev_parents
+               and label not in self._selectors_get_next_children(prev_parents)):
+            del prev_parents[-1]
+
+        if prev_parents:
+            return (prev_parents[-1].path_filter_combo_node,
+                    prev_parents[-1].path_combo_node)
+        else:
+            # We went up the whole parent tree and none are left -- start from root!
+            return path_filter_combo_prefix_root, path_combo_prefix_root
+
+    def _selectors_get_next_children(self, prev_parents):
+        """Return the children of the next parent in the given list of previous parents."""
+        prev_parent = prev_parents[-1]
+        prev_parent_container = self._containers[prev_parent.path]
+        return prev_parent_container._children
 
     def _status_msg_update(self, msg):
         """Process status messages."""
@@ -809,7 +841,7 @@ class HsmViewerFrame(wx.Frame):
         if not self._keep_running:
             return
 
-        # Get the path to the updating conainer
+        # Get the path to the updating container
         path = msg.path
         rospy.logdebug("STATUS MSG: "+path)
 
@@ -824,13 +856,13 @@ class HsmViewerFrame(wx.Frame):
                     if self._active_path in self._containers:
                         self._containers[prev_active_path].is_active = False
 
-                    # We update the parents even if the child is gone
-                    self._update_parents(prev_active_path, False)
+                    # We try to update the parent even if the child is gone
+                    self._update_parent(prev_active_path, False)
 
                     container.is_active = True
                     self._active_path = container._path
 
-                    self._update_parents(path, True)
+                    self._update_parent(path, True)
                     needs_update = True
             else:
                 rospy.logwarn("unknown state: " + path)
@@ -840,31 +872,26 @@ class HsmViewerFrame(wx.Frame):
                 self._needs_tree_update = True
                 self._update_cond.notify_all()
 
-    def _update_parents(self, path, set_active):
-        """Go up the tree from the given path, setting all sequential parents
-        to ``set_active`` and update their active children accordingly.
+    def _update_parent(self, path, set_active):
+        """Go up the tree from the given path and set the parent to ``set_active``,
+        updating its active children accordingly.
         """
         pathsplit = path.split('/')
+        if len(pathsplit) <= 1:
+            # There are no parents -- quit
+            return
+
         if set_active and path in self._containers:
             child = self._containers[path]
             active_children = [child._label]
         else:
             active_children = []
-        del pathsplit[-1]
 
-        while pathsplit:
-            parent_path = '/'.join(pathsplit)
+        parent_path = '/'.join(pathsplit[:-1])
 
-            # TODO Should we break in the else-case?
-            if parent_path in self._containers:
-                parent = self._containers[parent_path]
-                parent.active_states = active_children
-
-                # Update ``active_children``
-                if set_active:
-                    active_children = [parent._label]
-
-            del pathsplit[-1]
+        if parent_path in self._containers:
+            parent = self._containers[parent_path]
+            parent.active_states = active_children
 
     def _update_graph(self):
         """This thread continuously updates the graph when it changes.
@@ -889,12 +916,24 @@ class HsmViewerFrame(wx.Frame):
 
                 # Get the containers to update
                 containers_to_update = {}
-                if self._path in self._containers:
-                    # Some non-root path
-                    containers_to_update = {self._path:self._containers[self._path]}
+                top_container = self._find_top_container_for_path(self._path)
+                if top_container is not None:
+                    # Some non-root and non-prefix path
+                    containers_to_update = {self._path: self._containers[self._path]}
                 elif self._path == '/':
                     # Root path
                     containers_to_update = self._top_containers
+                elif self._path in self._containers:
+                    # We have a valid container that is above top containers (a prefix container)
+                    # Find all top containers below and update those
+                    paths = [self._path]
+                    while paths:
+                        path = paths.pop()
+                        if path not in self._top_containers:
+                            container = self._containers[path]
+                            paths.extend((path + '/' + label for label in container._children))
+                        else:
+                            containers_to_update[path] = self._top_containers[path]
 
                 # Check if we need to re-generate the dotcode (if the structure changed)
                 # TODO: needs_zoom is a misnomer
@@ -971,20 +1010,37 @@ class HsmViewerFrame(wx.Frame):
                 self._needs_tree_update = False
 
                 for path,tc in self._top_containers.iteritems():
-                    self.add_to_tree(path, None)
+                    prefix_leaf = self.add_prefix_tree(path)
+                    modified = self.add_to_tree(path, prefix_leaf)
+                    if modified:
+                        self.tree_view.Expand(prefix_leaf)
                     self.update_tree_status(tc)
 
+    def add_prefix_tree(self, path):
+        """Add the individual labels in the full path to the tree and return the leaf node."""
+        if path in self._tree_nodes:
+            return self._tree_nodes[path]
+
+        parents = [self.tree_view.GetRootItem()]
+        split_path = path.split('/')[:-1]
+
+        for i, label in enumerate(split_path):
+            local_path = '/'.join(split_path[:i + 1])
+            parents.append(self.tree_view.AppendItem(parents[-1], label))
+            self._tree_nodes[local_path] = parents[-1]
+
+        # Cannot expand hidden root
+        for parent in parents[1:]:
+            self.tree_view.Expand(parent)
+        return parents[-1]
 
     def add_to_tree(self, path, parent):
         """Add a path to the tree view."""
         modified = False
-        container = self._tree_nodes.get(path, None)
-        if container is None:
-            if parent is None:
-                container = self.tree_view.AddRoot(get_label(path))
-            else:
-                container = self.tree_view.AppendItem(parent, get_label(path))
-            self._tree_nodes[path] = container
+        container_item = self._tree_nodes.get(path, None)
+        if container_item is None:
+            container_item = self.tree_view.AppendItem(parent, get_label(path))
+            self._tree_nodes[path] = container_item
             modified = True
 
         # Add children to tree
@@ -993,9 +1049,9 @@ class HsmViewerFrame(wx.Frame):
         added_children = False
         for label in children:
             child_path = '/'.join([path,label])
-            added_children |= self.add_to_tree(child_path, container)
+            added_children |= self.add_to_tree(child_path, container_item)
             if added_children:
-                self.tree_view.Expand(container)
+                self.tree_view.Expand(container_item)
 
         return modified | added_children
 
@@ -1076,11 +1132,30 @@ class HsmViewerFrame(wx.Frame):
             item = self.tree_view.GetItemParent(item)
 
         # Update the selection dropdown
-        self.path_input.SetValue('/'.join(reversed(paths)))
+        self.path_combo.SetValue('/'.join(reversed(paths[:-1])))
         wx.PostEvent(
-            self.path_input.GetEventHandler(),
-            wx.CommandEvent(wx.wxEVT_COMMAND_COMBOBOX_SELECTED, self.path_input.GetId()))
+            self.path_combo.GetEventHandler(),
+            wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_combo.GetId()))
         event.Skip()
+
+    def _find_top_container_for_path(self, path):
+        """Return the top container for the given path or ``None`` if the path
+        is above all top containers or does not exist.
+        """
+        if path not in self._containers:
+            return None
+        prev_path = ''
+        # Search for the root path of the state machine containing the selected path.
+        while (path not in self._top_containers
+               and path != prev_path):
+            prev_path = path
+            path = get_parent_path(path)
+
+        if path == prev_path:
+            # We were above a top container
+            return None
+        else:
+            return self._top_containers[path]
 
     @staticmethod
     def load_button_bitmap(path, file_type):
