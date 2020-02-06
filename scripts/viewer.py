@@ -628,15 +628,12 @@ class HsmViewerFrame(wx.Frame):
             return
 
         state_path = self._selected_paths[0]
-        parent_path = state_path
-        prev_parent_path = ''
-        # Search for the root path of the state machine containing the selected path.
-        while (parent_path not in self._transition_pubs
-               and parent_path != prev_parent_path):
-            prev_parent_path = parent_path
-            parent_path = get_parent_path(parent_path)
+        top_container = self._find_top_container_for_path(state_path)
+        if top_container is None:
+            # We were above a top container; no transition possible
+            return
 
-        transition_pub = self._transition_pubs[parent_path]
+        transition_pub = self._transition_pubs[top_container._path]
         transition_msg = String()
         transition_msg.data = state_path
         transition_pub.publish(transition_msg)
@@ -725,30 +722,12 @@ class HsmViewerFrame(wx.Frame):
 
     def selection_changed(self, event):
         """Event: Selection dropdown changed."""
-        path_combo_str = self.path_combo.GetValue()
+        path = self.path_combo.GetValue()
         # Store this item's url as the selected path
-        self._selected_paths = [path_combo_str]
+        self._selected_paths = [path]
 
-        # Check the path is non-zero length
-        if len(path_combo_str) > 0:
-            # Split the path (state:outcome), and get the state path
-            path = path_combo_str.split(':')[0]
-
-            # Get the container corresponding to this path, since userdata is
-            # stored in the containers
-            if path not in self._containers:
-                parent_path = get_parent_path(path)
-            else:
-                parent_path = path
-
-            if parent_path in self._containers:
-                # Enable the initial state button for the selection
-                #self.is_button.Enable()
-                self.tt_button.Enable()
-            else:
-                # Disable the initial state button for this selection
-                #self.is_button.Disable()
-                self.tt_button.Disable()
+        top_container = self._find_top_container_for_path(path)
+        self.tt_button.Enable(top_container is not None)
         self.update_graph()
 
     def _init_structure(self, msg, server_name):
@@ -1195,6 +1174,25 @@ class HsmViewerFrame(wx.Frame):
             self.path_combo.GetEventHandler(),
             wx.CommandEvent(wx.wxEVT_COMMAND_TEXT_UPDATED, self.path_combo.GetId()))
         event.Skip()
+
+    def _find_top_container_for_path(self, path):
+        """Return the top container for the given path or ``None`` if the path
+        is above all top containers or does not exist.
+        """
+        if path not in self._containers:
+            return None
+        prev_path = ''
+        # Search for the root path of the state machine containing the selected path.
+        while (path not in self._top_containers
+               and path != prev_path):
+            prev_path = path
+            path = get_parent_path(path)
+
+        if path == prev_path:
+            # We were above a top container
+            return None
+        else:
+            return self._top_containers[path]
 
     @staticmethod
     def load_button_bitmap(path, file_type):
