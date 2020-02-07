@@ -13,11 +13,6 @@ IMG_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'img', '')
 LABEL_SPACER = '   '
 """Text to get invisible spacing using labels."""
 
-PATH_TREE_MODEL_TEXT_COLUMN = 0
-"""The column of the path tree model containing the text shown."""
-PATH_TREE_MODEL_WEIGHT_COLUMN = 1
-"""The column of the path tree model containing the weight the text is rendered with."""
-
 
 def build_tree_model():
     """Return an empty tree model."""
@@ -159,21 +154,6 @@ def build_box(spacing=0, is_vertical=True):
     else:
         box.set_orientation(Gtk.Orientation.HORIZONTAL)
     return box
-
-
-def build_tree_view(model):
-    """Return the tree view for the given model."""
-    tree_view = Gtk.TreeView(model)
-    renderer = Gtk.CellRendererText()
-    column = Gtk.TreeViewColumn(
-        'Path',
-        renderer,
-        text=PATH_TREE_MODEL_TEXT_COLUMN,
-        weight=PATH_TREE_MODEL_WEIGHT_COLUMN,
-        weight_set=True
-    )
-    tree_view.append_column(column)
-    return tree_view
 
 
 def build_paned_frame(label=None):
