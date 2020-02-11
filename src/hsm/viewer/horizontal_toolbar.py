@@ -6,7 +6,7 @@ class HorizontalToolbar(Gtk.Toolbar):
     """
     A horizontal toolbar with an overflow menu.
 
-    Convenience wrapper around the original toolbar.
+    Convenience wrapper around the original ``Gtk.Toolbar``.
     """
 
     def __init__(self, *args, **kwargs):
