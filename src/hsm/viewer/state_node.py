@@ -129,3 +129,31 @@ class RootStateNode(StateNode):
         if not isinstance(active_state, StateNode):
             raise TypeError('``active_state`` must be a ``StateNode``.')
         self._active_state = active_state
+
+
+class DummyStateNode(StateNode):
+    """
+    A node containing only a path. Used to create prefix paths that have not received their
+    corresponding structure.
+    """
+
+    def __init__(self, path):
+        """Initialize a dummy state node with the given path."""
+        self._path = path
+
+    @property
+    def path(self):
+        """Return the path of this node. The path does not contain the prefix."""
+        return self._path
+
+    @property
+    def initial_state(self):
+        """
+        Return the label of the initial child state of this node or ``None`` if this is a leaf.
+        """
+        raise AttributeError('``DummyStateNode``s do not have an initial state.')
+
+    @property
+    def transitions(self):
+        """Return a list of labels of other states that can be transitioned into from this node."""
+        raise AttributeError('``DummyStateNode``s do not have transitions.')
