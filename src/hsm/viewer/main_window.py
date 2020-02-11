@@ -4,11 +4,16 @@ from gtk_wrap import Gtk
 import gui_element_builder as geb
 import graph_view as gv
 import main_toolbar as mt
+import state_tree_model as stm
 import tree_view as tv
 
 
 class MainWindow(Gtk.Window):
-    """Main window of the HSM viewer containing the toolbar, graph and tree view."""
+    """
+    Main window of the HSM viewer containing the toolbar, graph and tree view.
+
+    Also handles some backend activities such as initializing the model and starting threads.
+    """
 
     def __init__(self, width, height):
         """Initialize the main window with its backend models as well as its GUI elements."""
@@ -20,8 +25,10 @@ class MainWindow(Gtk.Window):
         self.__keep_running = True
 
         # Backend
-        self.container_tree_model = geb.build_tree_model()
+        self.container_tree_model = stm.StateTreeModel()
         """Tree store containing the containers."""
+
+        # FIXME Start threads: get servers, get struct msgs, get state msgs
 
         # Frontend
         self.__setup_gui_elements()

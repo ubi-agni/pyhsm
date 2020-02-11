@@ -14,12 +14,6 @@ LABEL_SPACER = '   '
 """Text to get invisible spacing using labels."""
 
 
-def build_tree_model():
-    """Return an empty tree model."""
-    tree_model = Gtk.TreeStore(str, int)
-    return tree_model
-
-
 def build_list_model(data=None):
     """Return a list model optionally filled with the given data."""
     list_model = Gtk.ListStore(str)
