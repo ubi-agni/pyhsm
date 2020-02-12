@@ -1,9 +1,6 @@
-"""
-Helper functions for creating the main window's GUI elements.
-"""
+"""Helper functions for creating the main window's GUI elements."""
 
 import os
-
 from .gtk_wrap import Gtk, GdkPixbuf
 
 
@@ -30,29 +27,18 @@ def build_label(text):
     return label
 
 
-def build_button(label=None, icon=None, icon_path=None, tooltip=None):
-    """
-    Return a button with the given attributes.
-    If both ``icon`` and ``icon_path`` are given, ``icon`` takes priority.
-    """
-    button = Gtk.Button()
-    if icon is None and icon_path is not None:
-        icon = build_image(icon_path)
-    if icon is not None:
-        button.set_image(icon)
+def build_button(label=None, icon=None, tooltip=None, type=Gtk.Button):
+    """Return a button with the given attributes."""
+    button = type()
     if label is not None:
         button.set_label(label)
+    if icon is not None:
+        if not isinstance(icon, Gtk.Image):
+            icon = build_image(icon)
+        button.set_image(icon)
     if tooltip is not None:
         button.set_tooltip_text(tooltip)
     return button
-
-
-def build_toggle_button(label=None):
-    """Return a toggle button with the given label."""
-    toggle_button = Gtk.ToggleButton.new()
-    if label is not None:
-        toggle_button.set_label(label)
-    return toggle_button
 
 
 def build_combo_box(model=None):
@@ -66,7 +52,7 @@ def build_combo_box(model=None):
     renderer = Gtk.CellRendererText()
     renderer.set_property('weight_set', True)
     combo_box.pack_start(renderer, True)
-    combo_box.set_cell_data_func(renderer, model.render_combo_box_path)
+    combo_box.set_cell_data_func(renderer, model.render_path)
 
     return combo_box
 
@@ -83,7 +69,7 @@ def build_toolbar():
 
 def build_tool_item(content=None, tooltip=None):
     """Return a tool item with the given content."""
-    tool_item = Gtk.ToolItem.new()
+    tool_item = Gtk.ToolItem()
     if content is not None:
         tool_item.add(content)
     if tooltip is not None:
@@ -106,30 +92,15 @@ def build_image(image_path, width=16, height=16):
     return image
 
 
-def build_tool_button_no_border(label=None, icon_path=None, tooltip=None):
-    """Return a ``Gtk.ToolButton`` with the given attributes."""
-    button = Gtk.ToolButton(label=label)
-    if icon_path is not None:
-        icon = build_image(icon_path, 20, 20)
-        button.set_icon_widget(icon)
-    if tooltip is not None:
-        button.set_tooltip_text(tooltip)
-    return button
-
-
 def build_tool_button(*args, **kwargs):
-    """
-    Return a button wrapped in a ``Gtk.ToolItem`` with the given attributes
-    (see ``build_button`` for details).
-    """
-    button = build_button(*args, **kwargs)
-    return build_tool_item(button)
+    """Return a button wrapped in a ``Gtk.ToolItem`` with the given attributes"""
+    return build_tool_item(build_button(*args, **kwargs))
 
 
 def build_menu_item(label, has_mnemonic=False):
-    """
-    Return a menu item with the given label. If ``has_mnemonic`` is ``True``, the mnemonic
-    character is indicated by an underscore in front of it.
+    """Return a menu item with the given label.
+
+    If ``has_mnemonic`` is ``True``, the mnemonic character is indicated by an underscore in front of it.
     """
     if has_mnemonic:
         return Gtk.MenuItem.new_with_mnemonic(label)
@@ -167,10 +138,7 @@ def build_paned_frame(label=None):
     # "Often, it is useful to put each child inside a Gtk.Frame with
     # the shadow type set to Gtk.ShadowType.IN so that the gutter
     # appears as a ridge." (retrieved 2019-03-08)
-    #
-    # We only do this for the detail view because the graph view
-    # should have all the space it can get.
-    frame = Gtk.Frame.new(label)
+    frame = Gtk.Frame(label)
     frame.set_shadow_type(Gtk.ShadowType.IN)
     return frame
 

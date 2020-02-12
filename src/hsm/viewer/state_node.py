@@ -21,7 +21,7 @@ class StateNode(GObject.GObject):
         before being assigned.
         """
         GObject.GObject.__init__(self)
-        if type(msg) is not msgs.HsmState:
+        if not isinstance(msg, msgs.HsmState):
             raise TypeError('``msg`` must be a ``HsmState`` message.')
         self._msg = msg
 

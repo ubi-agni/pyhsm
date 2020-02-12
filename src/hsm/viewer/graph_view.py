@@ -48,12 +48,12 @@ class GraphViewToolbar(HorizontalToolbar):
 
         # Toggle auto focus
         self.add_spacer()
-        self.auto_focus_toggle = geb.build_toggle_button('Auto Focus')
+        self.auto_focus_toggle = geb.build_button('Auto Focus', type=Gtk.ToggleButton)
         self.add(self.auto_focus_toggle)
 
         # Show implicit/transitions
         self.add_spacer()
-        self.show_all_toggle = geb.build_toggle_button('Show Implicit')
+        self.show_all_toggle = geb.build_button('Show Implicit', type=Gtk.ToggleButton)
         self.add(self.show_all_toggle)
 
         # Label width spin button

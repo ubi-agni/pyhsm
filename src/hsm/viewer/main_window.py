@@ -1,7 +1,7 @@
 import threading
 
 from gtk_wrap import Gtk
-import gui_element_builder as geb
+from gui_element_builder import build_box, build_statusbar
 from graph_view import GraphView
 from main_toolbar import MainToolbar
 from state_tree_model import StateTreeModel
@@ -29,11 +29,8 @@ class MainWindow(Gtk.Window):
         self.needs_tree_update = False
 
         # Backend
-        self.state_tree_model = StateTreeModel()
-        """Tree store containing the containers."""
-
-        self.hsms = {}
-        """Dictionary from server names to ``RootStateNode``s."""
+        self.state_tree_model = StateTreeModel()  # Tree store containing the containers
+        self.hsms = {}  # Dictionary from server names to ``RootStateNode``s
 
         # Start thread: get servers, then get structure msgs, then get state msgs.
         self.subscription_manager = SubscriptionManager(self)
@@ -46,26 +43,19 @@ class MainWindow(Gtk.Window):
 
     def __setup_gui_elements(self):
         """Create all GUI elements and add them to the window."""
-        root_vbox = self.__add_to(self, geb.build_box(4))
-        """The top level vertical boxing element."""
+        root_vbox = self.__add_to(self, build_box(4))  # top level vertical box
 
         # Prepare graph and tree view
-        self.graph_view = GraphView(self.state_tree_model)
-        """Graph view including its toolbar."""
-        self.tree_view = TreeView(self.state_tree_model)
-        """Tree view of all paths. Enables some interaction such as double clicking."""
+        self.graph_view = GraphView(self.state_tree_model)  # Graph view including its toolbar
+        self.tree_view = TreeView(self.state_tree_model)  # Tree view of all paths
         self.tree_view.set_no_show_all(True)
-
-        self.main_toolbar = MainToolbar(self)
-        """Always visible toolbar."""
+        self.main_toolbar = MainToolbar(self)  # main toolbar
 
         # Add elements in correct order
         self.__add_to(root_vbox, self.main_toolbar)
         self.__add_to(root_vbox, self.graph_view, expand=True)
         self.__add_to(root_vbox, self.tree_view, expand=True)
-
-        self.statusbar = self.__add_to(root_vbox, geb.build_statusbar())
-        """Status bar at the bottom of the window."""
+        self.__add_to(root_vbox, build_statusbar())
 
     def __del__(self):
         """Signal that the viewer is going to shut down."""
@@ -77,10 +67,8 @@ class MainWindow(Gtk.Window):
 
     @staticmethod
     def __add_to(parent, child, expand=False):
-        """
-        Add the given child to the given parent. If the parent is a ``Gtk.Box``, the
-        ``expand`` flag controls whether the added item will fill its space.
-        """
+        """Add the given child to the given parent. If the parent is a ``Gtk.Box``,
+           the ``expand`` flag controls whether the added item will fill its space."""
         if isinstance(parent, Gtk.Box):
             parent.pack_start(child, expand, expand, 0)
         else:

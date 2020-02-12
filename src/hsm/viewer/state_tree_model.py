@@ -30,17 +30,13 @@ class StateTreeModel(Gtk.TreeStore):
         self._create_attr_methods()
         self._create_local_root_attr_methods()
 
-        # Create root node
-        self.append(None, DummyStateNode('/'))
-        self.local_root_nodes = {}
-        """Mapping from server names to ``RootStateNode``s."""
+        self.append(None, DummyStateNode('/'))  # root node
+        self.local_root_nodes = {}  # Mapping from server names to ``RootStateNode``s
 
     # Metaprogramming
 
     def _create_attr_methods(self):
-        """
-        Create methods propagating a state node property getter to the state node contained in a
-        given node.
+        """Create methods propagating a state node property getter to the state node contained in a given node.
 
         For example, to access the ``transitions`` property of the global root node, use the following:
         ```
@@ -48,92 +44,31 @@ class StateTreeModel(Gtk.TreeStore):
         transitions_from_root = self.transitions(root_node)
         ```
         """
-        state_node_properties = ('path', 'parent_path', 'label',
-                                 'initial_state', 'transitions', 'is_root_state')
-        for attr in state_node_properties:
-            attr_method = self._create_attr_method(attr)
-            self.__setattr__(attr, attr_method)
+        for attr in ['path', 'parent_path', 'label', 'initial_state', 'transitions', 'is_root_state']:
+            self.__setattr__(attr, self._create_attr_method(attr))
 
     def _create_attr_method(self, attr):
-        """
-        Create a method propagating the given attribute getter to the state node contained in a
-        given node.
-        """
-
+        """Create a method propagating the given attribute getter to the state node of the given node."""
         def attr_method(node):
-            # TODO Can we write a formatted doc string here? Would be sweet.
             return self.get_value(node).__getattribute__(attr)
-
         return attr_method
 
     def _create_local_root_attr_methods(self):
-        """
-        Create methods that fetch the local root state node of a given node and propagate a property
-        getter to it.
+        """Create methods that fetch the local root state node of a given node and propagate a property getter to it.
 
-        For example, to access the ``server_name`` property of the local root of an arbitrary node,
-        use the following:
+        For example, to access the ``server_name`` property of the local root of an arbitrary node, use the following:
         ```
         node_server_name = self.server_name(node)
         ```
         """
-        root_state_node_properties = ('prefix', 'server_name',
-                                      'transition_publisher', 'active_state')
-        for attr in root_state_node_properties:
-            attr_method = self._create_local_root_attr_method(attr)
-            self.__setattr__(attr, attr_method)
+        for attr in ['prefix', 'server_name', 'transition_publisher', 'active_state']:
+            self.__setattr__(attr, self._create_local_root_attr_method(attr))
 
     def _create_local_root_attr_method(self, attr):
-        """
-        Create a method propagating the given attribute getter to the local root state node of the
-        state node contained in a given node.
-        """
-
+        """Create a method propagating the given attribute getter to the root state node of the given node."""
         def attr_method(node):
-            # TODO Can we write a formatted doc string here? Would be juicy.
             return self.local_root_state(node).__getattribute__(attr)
-
         return attr_method
-
-    # StateNode property functions
-
-    # def path(self, node):
-    #     """Return the state path stored in the given node."""
-    #     return self.get_value(node).path
-
-    # def parent_path(self, node):
-    #     """Return the state parent path stored in the given node."""
-    #     return self.get_value(node).parent_path
-
-    # def label(self, node):
-    #     """Return the state label stored in the given node."""
-    #     return self.get_value(node).label
-
-    # def initial_state(self, node):
-    #     """Return the initial state stored in the given node."""
-    #     return self.get_value(node).initial_state
-
-    # def transitions(self, node):
-    #     """Return the state transitions stored in the given node."""
-    #     return self.get_value(node).transitions
-
-    # RootStateNode property functions
-
-    # def prefix(self, node):
-    #     """Return the state prefix for the given node's HSM."""
-    #     return self.local_root_state(node).prefix
-
-    # def server_name(self, node):
-    #     """Return the server name for the given node's HSM."""
-    #     return self.local_root_state(node).server_name
-
-    # def transition_publisher(self, node):
-    #     """Return the transition publisher for the given node's HSM."""
-    #     return self.local_root_state(node).transition_publisher
-
-    # def active_state(self, node):
-    #     """Return the active state for the given node's HSM."""
-    #     return self.local_root_state(node).active_state
 
     # Tree convenience functions
 
@@ -212,10 +147,9 @@ class StateTreeModel(Gtk.TreeStore):
 
     # TODO Make it possible to start below an arbitrary parent (needs rework).
     def find_node(self, full_path, return_last_match=False):
-        """
-        Return the node stored with the given full path or ``None`` if it does not exist.
-        If ``return_last_match`` is ``True``, the last match (or root if there was none)
-        is returned.
+        """Return the node stored with the given full path or ``None`` if it does not exist.
+
+        If ``return_last_match`` is ``True``, the last match (or root if there was none) is returned.
         """
         parent = self.global_root_node()
         path_parts = full_path.split('/')
@@ -272,29 +206,26 @@ class StateTreeModel(Gtk.TreeStore):
         return parent
 
     def find_state(self, full_path, return_last_match=False):
-        """
-        Return the ``StateNode`` stored with the given full path or ``None`` if it does not exist.
-        If ``return_last_match`` is ``True``, the last match (or the root state if there was none)
-        is returned.
-        """
+        """Return the ``StateNode`` stored with the given full path or ``None`` if it does not exist.
+
+        If ``return_last_match`` is ``True``, the last match (or the root state if there was none) is returned."""
         node = self.find_node(full_path, return_last_match)
         return node and self.get_value(node)
 
-    def find_first_child_node(self, parent, pred):
-        """
-        Return the first child node under the given ``parent`` node where ``pred`` returns
-        ``True`` or ``None`` if no match was found.
-        ``pred`` is a 1-argument function each child node is passed to.
-        """
-        return next((n for n in self.child_nodes(parent) if pred(n)), None)
+    def find_first_child_node(self, parent, predicate):
+        """Return the first child node under the given ``parent`` node which satisfies ``predicate``
 
-    def find_first_child_state(self, parent, pred):
+        :arg ``predicate`` is a 1-argument function each child node is passed to.
+        :returns ``None`` if no match was found."""
+        return next((n for n in self.child_nodes(parent) if predicate(n)), None)
+
+    def find_first_child_state(self, parent, predicate):
+        """Return the first child ``StateNode`` under the given ``parent`` node which satisfies ``predicate``
+
+        :arg ``predicate`` is a 1-argument function each child node is passed to
+        :returns ``None`` if no match was found
         """
-        Return the first child ``StateNode`` under the given ``parent`` node where ``pred``
-        returns ``True`` or ``None`` if no match was found.
-        ``pred`` is a 1-argument function each child node is passed to.
-        """
-        child_node = self.find_first_child_node(parent, pred)
+        child_node = self.find_first_child_node(parent, predicate)
         return child_node and self.get_value(child_node)
 
     # Overwrites/overrides
@@ -323,14 +254,12 @@ class StateTreeModel(Gtk.TreeStore):
         if value.is_root_state:
             self.local_root_nodes[self.server_name(iter)] = iter
 
-    def get_value(self, iter, column=None):
+    def get_value(self, iter, column=STATE_COLUMN):
         """Return the value stored in the given tree ``iter`` at the given ``column``."""
-        if column is None:
-            column = self.STATE_COLUMN
         return Gtk.TreeStore.get_value(self, iter, column)
 
     def remove(self, iter):
-        """Remove the given ``Gtk.TreeIter`` from the tree and return whether it is still valid."""
+        """Remove the given ``Gtk.TreeIter`` from the tree and return whether iter is still valid."""
         if self.is_root_state(iter):
             del self.local_root_nodes[self.server_name(iter)]
 
@@ -343,11 +272,11 @@ class StateTreeModel(Gtk.TreeStore):
     # Structure message handling
 
     def build_from_structure_msg(self, msg, server_name, active_state=None):
+        """Update the ``StateTreeModel`` with the content from the ``HsmStructure`` message
+
+        :returns the root node of the HSM
         """
-        Fill the ``StateTreeModel`` with the given ``HsmStructure`` message's contents and return
-        the root node of the HSM.
-        """
-        if type(msg) is not msgs.HsmStructure:
+        if not isinstance(msg, msgs.HsmStructure):
             raise TypeError('``msg`` must be a ``HsmStructure`` message.')
 
         prefix_leaf = self._create_or_split_dummy(msg.prefix)
@@ -366,13 +295,11 @@ class StateTreeModel(Gtk.TreeStore):
 
         return local_root
 
-    def _lazy_add_node(self, state_constr, path, possible_parent):
-        """
-        Add a new node with information from the given state obtained by executing ``state_constr``
+    def _lazy_add_node(self, state_constructor, path, possible_parent):
+        """Add a new node with information from the given state obtained by executing ``state_constructor``
         if there is no existing node at the given ``path`` and return it (or the existing one).
 
-        ``state_constr`` is a 0-argument function used to lazily construct the state only
-        if necessary.
+        ``state_constructor`` is a 0-argument function used to lazily construct the state only if necessary.
         ``possible_parent`` is a helper node for efficiency; if ``possible_parent`` is not the
         correct parent of ``state``, the tree is traveled up until found.
         """
@@ -392,7 +319,7 @@ class StateTreeModel(Gtk.TreeStore):
 
         # Search for an existing node with the given path
         existing_node = self.find_first_child_node(
-            parent, lambda node: self.contains_path(node, path))
+            parent, lambda node: self.has_path(node, path))
 
         if isinstance(existing_node, DummyStateNode):
             # We know the path exists in the tree but it is a dummy node.
@@ -401,7 +328,7 @@ class StateTreeModel(Gtk.TreeStore):
 
             rospy.logdebug('CONSTRUCTING: ' + path)
             # Then we replace the data...
-            self.set_value(dummy_node, self.STATE_COLUMN, state_constr())
+            self.set_value(dummy_node, self.STATE_COLUMN, state_constructor())
             # And return the ex-dummy node as the new parent.
             return dummy_node
         elif existing_node:
@@ -410,13 +337,13 @@ class StateTreeModel(Gtk.TreeStore):
         else:
             # No special case; we can simply add a node to the tree under the correct parent.
             rospy.logdebug('CONSTRUCTING: ' + path)
-            return self.append(parent, state_constr())
+            return self.append(parent, state_constructor())
 
     def _create_or_split_dummy(self, path):
-        """
-        Return a node for the given path. If the state with the given path is a dummy node for which
-        the given path lies in its stored path, the dummy node is split at that location and the
-        correct node returned.
+        """Return a (dummy) node for the given path.
+
+        If the state with the given path is a dummy node for which the given path lies in its stored path,
+        the dummy node is split at that location and the correct node returned.
         """
         if not path:
             return self.global_root_node()
@@ -443,8 +370,7 @@ class StateTreeModel(Gtk.TreeStore):
                 return self.append(node, dummy_state)
 
     def _split_dummy(self, node, path):
-        """
-        Return a node for the given path. If the given node contains a dummy node for which the
+        """Return a node for the given path. If the given node contains a dummy node for which the
         given path lies in its stored path, the dummy node is split at that location and the
         correct node returned.
         """
@@ -487,11 +413,8 @@ class StateTreeModel(Gtk.TreeStore):
 
         return new_parent
 
-    def contains_path(self, node, path):
-        """
-        Find out whether the given node has the same path as the given path.
-        Correctly handles dummy nodes.
-        """
+    def has_path(self, node, path):
+        """Check whether the given node has the given path."""
         node_path = self.path(node)
         if isinstance(node, DummyStateNode):
             path_parts = path.split('/')
@@ -510,9 +433,9 @@ class StateTreeModel(Gtk.TreeStore):
     # State message handling
 
     def update_active_from_current_state_msg(self, msg, server_name):
-        """
-        Update the active state from the given ``HsmCurrentState`` message and return whether the
-        active state has changed.
+        """Update the active state from the given ``HsmCurrentState`` message
+
+        :return whether the active state has changed
         If the state or its local root does not exist, do not do anything (and return ``False``).
         """
         # TODO Maybe change return type do be able to indicate actual failure versus
@@ -545,10 +468,9 @@ class StateTreeModel(Gtk.TreeStore):
 
     @staticmethod
     def render_path(column, cell, model, iter, user_data=None):
-        """
-        Cell data function to render the path of a state node in a tree view.
-        Also applies a bold font weight if the state node is active and the renderer has
-        ``weight_set`` set to ``True``.
+        """Cell data function to render the path of a state node in a tree view.
+
+        Applies bold font weight if the state node is active and the renderer has ``weight_set`` set to ``True``.
         """
         # We keep the names supplied in the official documentation in case this is called by kwargs.
         # `column` is the `Gtk.TreeViewColumn`, `cell` the `Gtk.CellDataRenderer`,
@@ -561,32 +483,7 @@ class StateTreeModel(Gtk.TreeStore):
         cell.set_property('text', path)
 
         if cell.get_property('weight_set'):
-            if isinstance(state, DummyStateNode):
-                cell.set_property('weight', model.create_weight(False))
-            else:
-                # TODO If this is too slow, create an extra column for the weight.
-                active_state = model.active_state(iter)
-                # TODO Do we need an ``is`` instead of ``==`` here for speed?
-                cell.set_property('weight', model.create_weight(state.path == active_state.path))
-
-    @staticmethod
-    def render_combo_box_path(celllayout, cell, model, iter, user_data=None):
-        # We keep the names supplied in the official documentation in case this is called by kwargs.
-        # `cellayout` is the `Gtk.ComboBox`, `cell` the `Gtk.CellDataRenderer`,
-        # `iter` the `Gtk.TreeIter` and `user_data` is any extra supplied argument (unused).
-        StateTreeModel.render_path(celllayout, cell, model, iter, user_data)
-
-        # TODO Maybe do not update here but only on construction and in the popdown callback
-        state = model.get_value(iter)
-        if not isinstance(state, DummyStateNode) and iter != celllayout.get_active_iter():
-            active_state = model.active_state(iter)
-            if state.path == active_state.path:
-                celllayout.set_active_iter(iter)
-
-    @staticmethod
-    def create_weight(make_bold):
-        """Return the correct ``Pango.Weight`` depending on the value of ``make_bold``."""
-        if make_bold:
-            return Pango.Weight.BOLD
-        else:
-            return Pango.Weight.NORMAL
+            weight = Pango.Weight.NORMAL
+            if not isinstance(state, DummyStateNode) and state is model.active_state(iter):
+                weight = Pango.Weight.BOLD
+            cell.set_property('weight', weight)
