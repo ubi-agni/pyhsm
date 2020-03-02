@@ -325,7 +325,6 @@ class State(object):
             _call(handler, e)
         elif transition is not None:
             sm = self.root
-            leaf_state_before = self.leaf_state
             to_state = transition['to_state']
             if isinstance(to_state, _History):
                 to_state = to_state.parent.history_state
@@ -334,7 +333,7 @@ class State(object):
             top_state = sm._exit_states(event, self, to_state)
             transition['action'](self, event)
             sm._enter_states(event, top_state, to_state)
-            sm.call_transition_cbs(leaf_state_before, self.leaf_state)
+            sm.call_transition_cbs(current, to_state)
             # Why is self.parent.leaf_state passed here?
             # transition['after'](self.parent.leaf_state, event)
             transition['after'](to_state, event)
