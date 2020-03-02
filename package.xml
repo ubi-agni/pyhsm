@@ -9,8 +9,8 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>rospy</build_depend>
-  <exec_depend>rospy</exec_depend>
+  <depend>rospy</depend>
+  <depend>pyhsm_msgs</depend>
   <test_depend>rostest</test_depend>
 
   <export>
