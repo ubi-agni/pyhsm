@@ -52,8 +52,7 @@ def _build_state_msgs(machine):
             node_stack.extend(node.states)
 
         # Update path correctly; handle changing parent paths
-        _update_parent_hierarchy_(
-            parent_hierarchy, node)
+        _update_parent_hierarchy_(parent_hierarchy, node)
         curr_path = '/'.join(map(lambda s: s.name, parent_hierarchy))
 
         state_msg = _build_state_msg(node, curr_path)
@@ -84,9 +83,9 @@ def _build_state_msg(state, full_path):
     path up to and including it.
     """
     # If state is not a leaf ``State``
-    if hasattr(state, 'initial_state'):
+    try:
         initial_state = state.initial_state.name
-    else:
+    except AttributeError:
         initial_state = ''
     transitions = _build_transition_msgs(state)
 
