@@ -1,6 +1,6 @@
 import pyhsm_msgs.msg as msgs
 
-from hsm.core import _History
+from hsm.core import _History, any_event
 
 # TODO We could refactor so these methods are again part of ContainerProxy;
 # in the end, we could build the hierarchy from the proxies instead
@@ -100,14 +100,15 @@ def _build_transition_msgs(state):
 
     # Set up transition -> events mapping
     for event, transitions in state._transitions.items():
+        if event is any_event:
+            event = '*'
         for transition in transitions:
             # Transitions are ``dict``s, those cannot be hashed
             hashable_transition = frozenset(transition.items())
             if hashable_transition not in transition_to_events_dict:
                 transition_to_events_dict[hashable_transition] = [event]
             else:
-                transition_to_events_dict[hashable_transition].append(
-                    event)
+                transition_to_events_dict[hashable_transition].append(event)
 
     for transition, events in transition_to_events_dict.items():
         transition = dict(transition)

@@ -1,9 +1,10 @@
 from __future__ import print_function
 
 import threading, logging, time, rospy, sys
-
+import hsm
 from hsm import State, Container, StateMachine, Event
 from hsm.introspection import IntrospectionServer
+
 
 class HeatingState(Container):
     def __init__(self, name):
@@ -43,7 +44,8 @@ class Oven(StateMachine):
         door_closed.add_transition('toast', heating['Toasting'])
         door_closed.add_transition('bake', heating['Baking'])
         door_closed.add_transition(events=['off', 'timeout'], target_state=off)
-        door_closed.add_transition('open', door_open)
+        #door_closed.add_transition('open', door_open)
+        door_closed.add_transition(hsm.core.any_event, door_open)
 
         # trigger transition to HISTORY state
         door_open.add_transition('close', door_closed.HISTORY)
