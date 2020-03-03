@@ -312,19 +312,19 @@ class IntrospectionServer():
         return '/'.join(names)
 
     def _transition_cmd_cb(self, msg):
-        # Remove prefix from msg path (as the state machine does not know about it)
-        if self._path:
-            path = msg.data[len(self._path) + 1:]
-        else:
-            path = msg.data
-
         to_state = self._machine
-        try:
-            for k in path.split('/')[1:]:
-                to_state = to_state[k]
-        except:
-            rospy.logerr('Unknown state {}'.format(msg.data))
+        prefix = self._path + '/' if self._path else ''
+        prefix += to_state.name
+        if not msg.data.startswith(prefix):
+            rospy.logerr('Invalid path prefix. Expecting: ' + prefix)
             return
+        path = msg.data[len(prefix)+1:]
+
+        for k in path.split('/'):
+            to_state = to_state[k]
+            if to_state is None:
+                rospy.logerr('Unknown state {}'.format(msg.data))
+                return
 
         # dispatch an event to trigger the transition
         # (don't call _transition_to() directly!)
