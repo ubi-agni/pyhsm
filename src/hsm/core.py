@@ -796,6 +796,7 @@ def run(sm, final_state):
     def _signal_handler(signum, frame):
         print(' Finishing on signal')
         sm._transition_to(final_state, event=None)
+        sm.dispatch(object())  # finish event_queue
 
     # install signal handler
     old_int_handler = signal.signal(signal.SIGINT, _signal_handler)
@@ -803,7 +804,7 @@ def run(sm, final_state):
 
     while not _finished():
         try:
-            event = event_queue.get(False, 0.1)
+            event = event_queue.get()
             sm._dispatch(event)
         except Queue.Empty:
             pass
