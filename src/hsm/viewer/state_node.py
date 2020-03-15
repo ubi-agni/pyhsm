@@ -1,5 +1,8 @@
 import pyhsm_msgs.msg as msgs
+import rospy
+from std_msgs.msg import String
 
+from .. import introspection
 from gtk_wrap import GObject
 
 
@@ -92,7 +95,7 @@ class RootStateNode(StateNode):
     This is the root node of the tree of states representing a whole HSM.
     """
 
-    def __init__(self, msg, prefix, server_name, publisher, active_state=None):
+    def __init__(self, msg, prefix, server_name, active_state=None):
         """
         Initialize a state node from the given ``HsmState`` message as well as other information
         related to the server of this HSM.
@@ -100,8 +103,13 @@ class RootStateNode(StateNode):
         StateNode.__init__(self, msg)
         self._prefix = prefix
         self._server_name = server_name
-        self._publisher = publisher
         self._active_state = active_state
+
+        self._transition_publisher = rospy.Publisher(
+            server_name + introspection.TRANSITION_TOPIC,
+            String,
+            queue_size=1,
+        )
 
     # HSM-related methods
 
@@ -114,8 +122,8 @@ class RootStateNode(StateNode):
         return self._server_name
 
     @property
-    def publisher(self):
-        return self._publisher
+    def transition_publisher(self):
+        return self._transition_publisher
 
     @property
     def active_state(self):

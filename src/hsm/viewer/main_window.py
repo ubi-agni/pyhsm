@@ -5,6 +5,7 @@ import gui_element_builder as geb
 from graph_view import GraphView
 from main_toolbar import MainToolbar
 from state_tree_model import StateTreeModel
+from subscription_manager import SubscriptionManager
 from tree_view import TreeView
 
 
@@ -24,15 +25,18 @@ class MainWindow(Gtk.Window):
         self.keep_running = True
 
         self.update_cond = threading.Condition()
+        self.needs_graph_update = False
+        self.needs_tree_update = False
 
         # Backend
         self.state_tree_model = StateTreeModel()
         """Tree store containing the containers."""
 
-        # FIXME Start threads: get servers, get struct msgs, get state msgs
         self.hsms = {}
         """Dictionary from server names to ``RootStateNode``s."""
 
+        # Start thread: get servers, then get structure msgs, then get state msgs.
+        self.subscription_manager = SubscriptionManager(self)
 
         # Frontend
         self.__setup_gui_elements()
