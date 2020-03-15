@@ -2,10 +2,10 @@ import threading
 
 from gtk_wrap import Gtk
 import gui_element_builder as geb
-import graph_view as gv
-import main_toolbar as mt
-import state_tree_model as stm
-import tree_view as tv
+from graph_view import GraphView
+from main_toolbar import MainToolbar
+from state_tree_model import StateTreeModel
+from tree_view import TreeView
 
 
 class MainWindow(Gtk.Window):
@@ -21,14 +21,18 @@ class MainWindow(Gtk.Window):
         self.set_border_width(5)
         self.set_default_size(width, height)
 
-        self.__update_cond = threading.Condition()
-        self.__keep_running = True
+        self.keep_running = True
+
+        self.update_cond = threading.Condition()
 
         # Backend
-        self.container_tree_model = stm.StateTreeModel()
+        self.state_tree_model = StateTreeModel()
         """Tree store containing the containers."""
 
         # FIXME Start threads: get servers, get struct msgs, get state msgs
+        self.hsms = {}
+        """Dictionary from server names to ``RootStateNode``s."""
+
 
         # Frontend
         self.__setup_gui_elements()
@@ -42,13 +46,13 @@ class MainWindow(Gtk.Window):
         """The top level vertical boxing element."""
 
         # Prepare graph and tree view
-        self.graph_view = gv.GraphView(self.container_tree_model)
+        self.graph_view = GraphView(self.state_tree_model)
         """Graph view including its toolbar."""
-        self.tree_view = tv.TreeView(self.container_tree_model)
+        self.tree_view = TreeView(self.state_tree_model)
         """Tree view of all paths. Enables some interaction such as double clicking."""
         self.tree_view.set_no_show_all(True)
 
-        self.main_toolbar = mt.MainToolbar(self)
+        self.main_toolbar = MainToolbar(self)
         """Always visible toolbar."""
 
         # Add elements in correct order
@@ -61,9 +65,9 @@ class MainWindow(Gtk.Window):
 
     def __del__(self):
         """Signal that the viewer is going to shut down."""
-        with self.__update_cond:
-            self.__keep_running = False
-            self.__update_cond.notify_all()
+        with self.update_cond:
+            self.keep_running = False
+            self.update_cond.notify_all()
         if hasattr(Gtk.Window, '__del__'):
             Gtk.Window.__del__(self)
 

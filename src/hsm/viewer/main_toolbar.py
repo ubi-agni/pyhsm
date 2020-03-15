@@ -35,7 +35,7 @@ class MainToolbar(HorizontalToolbar):
         """Connect all callbacks to the GUI elements."""
         self.toggle_view_button.connect('clicked', self.__toggle_view,
                                         main_window.graph_view, main_window.tree_view)
-        # FIXME
+        # FIXME Create other callback and connect elements to them.
 
     def __toggle_view(self, button, graph_view, tree_view):
         if self.__showing_graph_view:

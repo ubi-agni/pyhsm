@@ -74,6 +74,7 @@ class GraphViewToolbar(HorizontalToolbar):
         self.add(help_tool_button)
 
         # Save
+        self.add_spacer()
         self.save_button = geb.build_button(label='Save')
         self.save_button_proxy = geb.build_menu_item('Save')
         save_tool_button = geb.build_tool_item(self.save_button)
@@ -82,5 +83,5 @@ class GraphViewToolbar(HorizontalToolbar):
 
     def __connect_callbacks(self):
         """Connect all callbacks to the GUI elements."""
-        # FIXME
+        # FIXME Create callbacks and connect all elements to them.
         pass

@@ -10,10 +10,10 @@ class TreeView(Gtk.TreeView):
 
         # Enable bold text
         renderer = Gtk.CellRendererText()
+        renderer.set_property('weight_set', True)
         column = Gtk.TreeViewColumn(
             'Path',
             renderer,
-            weight_set=True,
         )
         column.set_cell_data_func(renderer, model.render_path)
         self.append_column(column)
