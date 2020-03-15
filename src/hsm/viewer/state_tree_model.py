@@ -1,3 +1,5 @@
+import rospy
+
 import pyhsm_msgs.msg as msgs
 
 from gtk_wrap import Gtk, Pango
@@ -10,6 +12,13 @@ class StateTreeModel(Gtk.TreeStore):
 
     Also provides a cell data function to render text from the internal nodes correctly
     (see ``render_path``).
+
+    We discern between the global and local root node:
+    The global root node is the root of the tree and only zero or one global root node can exist.
+    Local root nodes are the root nodes of the HSMs we add to the tree. Multiple of these can exist.
+
+    We also discern between "node" and "state" in some path-related functions.
+    A "node" refers to a ``Gtk.TreeIter`` while a "state" refers to the underlying ``StateNode``.
     """
 
     STATE_COLUMN = 0
@@ -23,6 +32,8 @@ class StateTreeModel(Gtk.TreeStore):
 
         # Create root node
         self.append(None, DummyStateNode('/'))
+        self.local_root_nodes = {}
+        """Mapping from server names to ``RootStateNode``s."""
 
     # Metaprogramming
 
@@ -30,6 +41,12 @@ class StateTreeModel(Gtk.TreeStore):
         """
         Create methods propagating a state node property getter to the state node contained in a
         given node.
+
+        For example, to access the ``transitions`` property of the global root node, use the following:
+        ```
+        root_node = self.global_root_node()
+        transitions_from_root = self.transitions(root_node)
+        ```
         """
         state_node_properties = ('path', 'parent_path', 'label',
                                  'initial_state', 'transitions', 'is_root_state')
@@ -43,9 +60,9 @@ class StateTreeModel(Gtk.TreeStore):
         given node.
         """
 
-        def attr_method(self, node):
+        def attr_method(node):
             # TODO Can we write a formatted doc string here? Would be sweet.
-            return self.get_value(node).__getattr__(attr)
+            return self.get_value(node).__getattribute__(attr)
 
         return attr_method
 
@@ -53,21 +70,28 @@ class StateTreeModel(Gtk.TreeStore):
         """
         Create methods that fetch the local root state node of a given node and propagate a property
         getter to it.
+
+        For example, to access the ``server_name`` property of the local root of an arbitrary node,
+        use the following:
+        ```
+        node_server_name = self.server_name(node)
+        ```
         """
-        root_state_node_properties = ('prefix', 'server_name', 'publisher', 'active_state')
+        root_state_node_properties = ('prefix', 'server_name',
+                                      'transition_publisher', 'active_state')
         for attr in root_state_node_properties:
             attr_method = self._create_local_root_attr_method(attr)
             self.__setattr__(attr, attr_method)
 
-    def _create_local_root_attr_method(self, attr)
+    def _create_local_root_attr_method(self, attr):
         """
         Create a method propagating the given attribute getter to the local root state node of the
         state node contained in a given node.
         """
 
-        def attr_method(self, node):
+        def attr_method(node):
             # TODO Can we write a formatted doc string here? Would be juicy.
-            return self.local_root_state(node).__getattr__(attr)
+            return self.local_root_state(node).__getattribute__(attr)
 
         return attr_method
 
@@ -103,9 +127,9 @@ class StateTreeModel(Gtk.TreeStore):
     #     """Return the server name for the given node's HSM."""
     #     return self.local_root_state(node).server_name
 
-    # def publisher(self, node):
-    #     """Return the publisher for the given node's HSM."""
-    #     return self.local_root_state(node).publisher
+    # def transition_publisher(self, node):
+    #     """Return the transition publisher for the given node's HSM."""
+    #     return self.local_root_state(node).transition_publisher
 
     # def active_state(self, node):
     #     """Return the active state for the given node's HSM."""
@@ -186,14 +210,15 @@ class StateTreeModel(Gtk.TreeStore):
         """Return a generator over the child ``StateNode``s of the given node."""
         return map(self.get_value, self.child_nodes(parent))
 
-    def find_node(self, path, return_last_match=False):
+    # TODO Make it possible to start below an arbitrary parent (needs rework).
+    def find_node(self, full_path, return_last_match=False):
         """
-        Return the node stored with the given path or ``None`` if it does not exist.
+        Return the node stored with the given full path or ``None`` if it does not exist.
         If ``return_last_match`` is ``True``, the last match (or root if there was none)
         is returned.
         """
         parent = self.global_root_node()
-        path_parts = path.split('/')
+        path_parts = full_path.split('/')
         # Strip an empty start (happens when the given path starts with '/').
         # We do this because we start by looking at the children of the root node.
         if path_parts and not path_parts[0]:
@@ -222,8 +247,8 @@ class StateTreeModel(Gtk.TreeStore):
                     #    3. Dummy path does not match at all (we already cover this by
                     #       doing nothing).
 
-                    child_path = self.path(child)
-                    child_path_parts = child_path.split('/')
+                    child_full_path = self.full_path(child)
+                    child_path_parts = child_full_path.split('/')
 
                     if child_path_parts[:len(path_parts)] == path_parts:
                         # Case 1
@@ -246,13 +271,13 @@ class StateTreeModel(Gtk.TreeStore):
                     return None
         return parent
 
-    def find_state(self, path, return_last_match=False):
+    def find_state(self, full_path, return_last_match=False):
         """
-        Return the ``StateNode`` stored with the given path or ``None`` if it does not exist.
+        Return the ``StateNode`` stored with the given full path or ``None`` if it does not exist.
         If ``return_last_match`` is ``True``, the last match (or the root state if there was none)
         is returned.
         """
-        node = self.find_node(path, return_last_match)
+        node = self.find_node(full_path, return_last_match)
         return node and self.get_value(node)
 
     def find_first_child_node(self, parent, pred):
@@ -261,7 +286,7 @@ class StateTreeModel(Gtk.TreeStore):
         ``True`` or ``None`` if no match was found.
         ``pred`` is a 1-argument function each child node is passed to.
         """
-        return next(n for n in self.child_nodes(parent) if pred(n), None)
+        return next((n for n in self.child_nodes(parent) if pred(n)), None)
 
     def find_first_child_state(self, parent, pred):
         """
@@ -272,7 +297,7 @@ class StateTreeModel(Gtk.TreeStore):
         child_node = self.find_first_child_node(parent, pred)
         return child_node and self.get_value(child_node)
 
-    # Convenience overwrites
+    # Overwrites/overrides
 
     def append(self, parent, row=None):
         """Append ``row`` to the ``parent`` node. If ``parent`` is ``None``, create a new root."""
@@ -281,19 +306,43 @@ class StateTreeModel(Gtk.TreeStore):
                 iter(row)
             except TypeError:
                 row = (row,)
-        Gtk.TreeStore.append(parent, row)
+        node = Gtk.TreeStore.append(self, parent, row)
 
-    def get_value(self, iter, column=self.STATE_COLUMN):
+        # Update root nodes
+        if self.is_root_state(node):
+            self.local_root_nodes[self.server_name(node)] = node
+        return node
+
+    def set_value(self, iter, column, value):
+        """Set the value in the given ``Gtk.TreeIter`` at the given column to the given one."""
+        was_root = self.is_root_state(iter)
+        Gtk.TreeStore.set_value(self, iter, column, value)
+
+        if was_root and not value.is_root_state:
+            del self.local_root_nodes[self.server_name(iter)]
+        if value.is_root_state:
+            self.local_root_nodes[self.server_name(iter)] = iter
+
+    def get_value(self, iter, column=None):
         """Return the value stored in the given tree ``iter`` at the given ``column``."""
+        if column is None:
+            column = self.STATE_COLUMN
         return Gtk.TreeStore.get_value(self, iter, column)
+
+    def remove(self, iter):
+        """Remove the given ``Gtk.TreeIter`` from the tree and return whether it is still valid."""
+        if self.is_root_state(iter):
+            del self.local_root_nodes[self.server_name(iter)]
+
+        return Gtk.TreeStore.remove(self, iter)
 
     # Dot code generation
 
-    # FIXME (maybe new class?)
+    # FIXME Base this on old ContainerNode dot code generation code (maybe new class?).
 
     # Structure message handling
 
-    def build_from_structure_msg(self, msg, server_name, publisher, active_state=None):
+    def build_from_structure_msg(self, msg, server_name, active_state=None):
         """
         Fill the ``StateTreeModel`` with the given ``HsmStructure`` message's contents and return
         the root node of the HSM.
@@ -301,56 +350,67 @@ class StateTreeModel(Gtk.TreeStore):
         if type(msg) is not msgs.HsmStructure:
             raise TypeError('``msg`` must be a ``HsmStructure`` message.')
 
-        prefix_leaf = self._create_dummy_tree(msg.prefix)
-        root_state = RootStateNode(msg.states[0], msg.prefix, server_name, publisher, active_state)
-        local_root = self.append(prefix_leaf, root_state)
+        prefix_leaf = self._create_or_split_dummy(msg.prefix)
+
+        local_root = self._lazy_add_node(
+            lambda: RootStateNode(msg.states[0], msg.prefix, server_name, active_state),
+            msg.states[0].path,
+            prefix_leaf)
         parent = local_root
 
         for state_msg in msg.states[1:]:
-            parent = self._add_node_from_state_msg(state_msg, parent, prefix_leaf)
+            parent = self._lazy_add_node(
+                lambda: StateNode(state_msg),
+                state_msg.path,
+                parent)
 
         return local_root
 
-    def _add_node_from_state_msg(self, state_msg, parent, excluded_upper_limit):
+    def _lazy_add_node(self, state_constr, path, possible_parent):
         """
-        Add a new node under the given parent if there is no existing node at that location
-        and return it (or the existing one).
-        ``excluded_upper_limit`` is a node indicating at which point the parent hierarchy has
-        been traveled too far upwards in search of a parent. It should be an ancestor of ``parent``.
+        Add a new node with information from the given state obtained by executing ``state_constr``
+        if there is no existing node at the given ``path`` and return it (or the existing one).
+
+        ``state_constr`` is a 0-argument function used to lazily construct the state only
+        if necessary.
+        ``possible_parent`` is a helper node for efficiency; if ``possible_parent`` is not the
+        correct parent of ``state``, the tree is traveled up until found.
         """
-        path = state_msg.path
+        parent_path = StateNode.get_parent_path(path)
+
+        # The second condition is to check whether possible_parent is the root node already
+        # in which case we want it to be the parent no matter what.
+        if self.path(possible_parent) != parent_path and self.path(possible_parent) != '/':
+            parent = next((p for p in self.local_parent_nodes(possible_parent)
+                           if self.path(p) == parent_path), None)
+        else:
+            parent = possible_parent
+        if parent is None:
+            raise ValueError(
+                'Could not get back to a valid parent during tree construction. '
+                "Searched for a parent with path '{}'.".format(parent_path))
 
         # Search for an existing node with the given path
         existing_node = self.find_first_child_node(
             parent, lambda node: self.contains_path(node, path))
-        if not existing_node:
-            # TODO We could also update the existing node here instead of skipping.
-            return existing_node
-
-        state = StateNode(state_msg)
 
         if isinstance(existing_node, DummyStateNode):
             # We know the path exists in the tree but it is a dummy node.
             # First we get the correct dummy node we want to replace with our data...
             dummy_node = self._split_dummy(existing_node, path)
 
+            rospy.logdebug('CONSTRUCTING: ' + path)
             # Then we replace the data...
-            self.set_value(dummy_node, self.STATE_COLUMN, state)
+            self.set_value(dummy_node, self.STATE_COLUMN, state_constr())
             # And return the ex-dummy node as the new parent.
             return dummy_node
+        elif existing_node:
+            # TODO We could also update the existing node here instead of skipping.
+            return existing_node
         else:
             # No special case; we can simply add a node to the tree under the correct parent.
-            parent_path = state.parent_path
-
-            while self.path(parent) != parent_path:
-                # Parent is not correct; walk up until we get the correct one.
-                parent = self.parent_node(parent)
-                if parent == excluded_upper_limit:
-                    raise ValueError(
-                        'Could not get back to a valid parent during tree construction. '
-                        "Searched for a parent with path '{}'.".format(parent_path))
-
-            return self.append(parent, state)
+            rospy.logdebug('CONSTRUCTING: ' + path)
+            return self.append(parent, state_constr())
 
     def _create_or_split_dummy(self, path):
         """
@@ -358,6 +418,9 @@ class StateTreeModel(Gtk.TreeStore):
         the given path lies in its stored path, the dummy node is split at that location and the
         correct node returned.
         """
+        if not path:
+            return self.global_root_node()
+
         node = self.find_node(path, return_last_match=True)
 
         if node and node != self.global_root_node():
@@ -402,10 +465,10 @@ class StateTreeModel(Gtk.TreeStore):
         old_new_parents = [(old_parent, new_parent)]
         old_nodes = [old_parent]
 
-        while parents:
+        while old_new_parents:
             old_parent, new_parent = old_new_parents.pop()
 
-            for old_child_node in self.children_nodes(old_parent):
+            for old_child_node in self.child_nodes(old_parent):
                 state = self.get_value(old_child_node)
                 if self.path(new_parent) != state.parent_path:
                     raise ValueError(
@@ -438,47 +501,87 @@ class StateTreeModel(Gtk.TreeStore):
             return node_path == path
 
     @classmethod
-    def from_structure_msg(cls, msg, server_name, publisher, active_state=None):
+    def from_structure_msg(cls, msg, server_name, active_state=None):
         """Return a new ``StateTreeModel`` from the given ``HsmStructure`` message's contents."""
         model = cls()
-        model._build_from_structure_msg(msg, server_name, publisher, active_state)
+        model.build_from_structure_msg(msg, server_name, active_state)
         return model
 
     # State message handling
 
-    def update_active_from_current_state_msg(self, msg):
+    def update_active_from_current_state_msg(self, msg, server_name):
         """
-        Update the active state from the given ``HsmCurrentState`` message.
-        If the state does not exist, do not do anything.
+        Update the active state from the given ``HsmCurrentState`` message and return whether the
+        active state has changed.
+        If the state or its local root does not exist, do not do anything (and return ``False``).
         """
+        # TODO Maybe change return type do be able to indicate actual failure versus
+        #      only "nothing changed"
         if type(msg) is not msgs.HsmCurrentState:
             raise TypeError('``msg`` must be a ``HsmCurrentState`` message.')
 
-        active_path = msg.path
+        local_root_node = self.local_root_nodes.get(server_name, None)
+        if not local_root_node:
+            rospy.logwarn("no local root with server name: " + server_name)
+            return False
+        local_root_state = self.get_value(local_root_node)
+
+        active_path = local_root_state.prefix + '/' + msg.path
+        # TODO If we could start searching below local_root_state, that would be great.
         active_node = self.find_node(active_path)
         if not active_node:
-            return
+            rospy.logwarn("unknown state: " + active_path)
+            return False
 
-        local_root_state = self.local_root_state(active_node)
-        local_root_state.active_state = active_path
+        if local_root_state.active_state is None:
+            state_changed = True
+        else:
+            state_changed = local_root_state.active_state.path != msg.path
+
+        local_root_state.active_state = self.get_value(active_node)
+        return state_changed
 
     # Static methods
 
     @staticmethod
-    def render_path(column, cell, model, iter, user_data):
+    def render_path(column, cell, model, iter, user_data=None):
         """
         Cell data function to render the path of a state node in a tree view.
         Also applies a bold font weight if the state node is active and the renderer has
         ``weight_set`` set to ``True``.
         """
+        # We keep the names supplied in the official documentation in case this is called by kwargs.
+        # `column` is the `Gtk.TreeViewColumn`, `cell` the `Gtk.CellDataRenderer`,
+        # `iter` the `Gtk.TreeIter` and `user_data` is any extra supplied argument (unused).
         state = model.get_value(iter)
-        renderer.set_property('text', path)
-        if renderer.weight_set and not isinstance(state, DummyStateNode):
-            # TODO If this is too slow, create an extra column for the weight.
+        if isinstance(state, DummyStateNode):
+            path = state.path
+        else:
+            path = state.label
+        cell.set_property('text', path)
+
+        if cell.get_property('weight_set'):
+            if isinstance(state, DummyStateNode):
+                cell.set_property('weight', model.create_weight(False))
+            else:
+                # TODO If this is too slow, create an extra column for the weight.
+                active_state = model.active_state(iter)
+                # TODO Do we need an ``is`` instead of ``==`` here for speed?
+                cell.set_property('weight', model.create_weight(state.path == active_state.path))
+
+    @staticmethod
+    def render_combo_box_path(celllayout, cell, model, iter, user_data=None):
+        # We keep the names supplied in the official documentation in case this is called by kwargs.
+        # `cellayout` is the `Gtk.ComboBox`, `cell` the `Gtk.CellDataRenderer`,
+        # `iter` the `Gtk.TreeIter` and `user_data` is any extra supplied argument (unused).
+        StateTreeModel.render_path(celllayout, cell, model, iter, user_data)
+
+        # TODO Maybe do not update here but only on construction and in the popdown callback
+        state = model.get_value(iter)
+        if not isinstance(state, DummyStateNode) and iter != celllayout.get_active_iter():
             active_state = model.active_state(iter)
-            path = state_node.path
-            # TODO Do we need an ``is`` instead of ``==`` here for speed?
-            renderer.set_property('weight', model.create_weight(state == active_state))
+            if state.path == active_state.path:
+                celllayout.set_active_iter(iter)
 
     @staticmethod
     def create_weight(make_bold):

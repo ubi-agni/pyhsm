@@ -12,7 +12,7 @@ class MainToolbar(HorizontalToolbar):
         self.__tree_view_icon = geb.build_image(geb.IMG_DIR + 'tree_view.png')
         self.__showing_graph_view = True
 
-        self.__setup_gui_elements(main_window.container_tree_model)
+        self.__setup_gui_elements(main_window.state_tree_model)
         self.__connect_callbacks(main_window)
 
     def __setup_gui_elements(self, model):
