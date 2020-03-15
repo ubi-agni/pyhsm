@@ -1,7 +1,9 @@
 import pyhsm_msgs.msg as msgs
 
+from gtk_wrap import GObject
 
-class StateNode(object):
+
+class StateNode(GObject.GObject):
     """
     A node mapping to a state in a HSM.
     The node is part of the tree of states representing a whole HSM.
@@ -15,6 +17,7 @@ class StateNode(object):
         Even though the parent does not have to be assigned, we throw an error if it is requested
         before being assigned.
         """
+        GObject.GObject.__init__(self)
         if type(msg) is not msgs.HsmState:
             raise TypeError('``msg`` must be a ``HsmState`` message.')
         self._msg = msg
@@ -29,12 +32,12 @@ class StateNode(object):
     @property
     def parent_path(self):
         """Return the parent path of this node. The parent path is the path without the label."""
-        self.get_parent_path(self.path)
+        return self.get_parent_path(self.path)
 
     @property
     def label(self):
         """Return the label of this node. The label is the part of the path after the last '/'."""
-        self.get_label(self.path)
+        return self.get_label(self.path)
 
     @property
     def initial_state(self):
@@ -61,7 +64,7 @@ class StateNode(object):
     # Static methods
 
     @staticmethod
-    def get_label(self, path):
+    def get_label(path):
         """
         Return the label part of the given path.
         The label is the part of the path after the last '/'.
@@ -70,7 +73,7 @@ class StateNode(object):
         return path[last_slash_index + 1:]
 
     @staticmethod
-    def get_parent_path(self, path):
+    def get_parent_path(path):
         """
         Return the parent part of the given path (the path without the label).
         If the path has no parent, return the empty string. If ``path`` is empty, return ``None``.
@@ -139,6 +142,8 @@ class DummyStateNode(StateNode):
 
     def __init__(self, path):
         """Initialize a dummy state node with the given path."""
+        # TODO store visible path as well (the new parts)
+        GObject.GObject.__init__(self)
         self._path = path
 
     @property
