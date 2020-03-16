@@ -22,8 +22,6 @@ class MainWindow(Gtk.Window):
         self.set_border_width(5)
         self.set_default_size(width, height)
 
-        self.keep_running = True
-
         self.update_cond = threading.Condition()
         self.needs_graph_update = False
         self.needs_tree_update = False
@@ -56,14 +54,6 @@ class MainWindow(Gtk.Window):
         self.__add_to(root_vbox, self.graph_view, expand=True)
         self.__add_to(root_vbox, self.tree_view, expand=True)
         self.__add_to(root_vbox, build_statusbar())
-
-    def __del__(self):
-        """Signal that the viewer is going to shut down."""
-        with self.update_cond:
-            self.keep_running = False
-            self.update_cond.notify_all()
-        if hasattr(Gtk.Window, '__del__'):
-            Gtk.Window.__del__(self)
 
     @staticmethod
     def __add_to(parent, child, expand=False):

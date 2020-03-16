@@ -31,7 +31,7 @@ class SubscriptionManager(object):
 
     def _update_server_loop(self):
         """Periodically update the known HSM introspection servers."""
-        while self._viewer.keep_running:
+        while not rospy.is_shutdown():
             # Update the server list
             server_names = self._client.get_servers()
 
@@ -66,7 +66,7 @@ class SubscriptionManager(object):
         Build the tree as given by the ``HsmStructure`` message and subscribe to the server's
         status messages.
         """
-        if not self._viewer.keep_running:
+        if rospy.is_shutdown():
             return
 
         rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
@@ -97,7 +97,7 @@ class SubscriptionManager(object):
 
     def _update_tree(self, msg, server_name):
         """Update the tree using the given ``HsmCurrentState`` message."""
-        if not self._viewer.keep_running:
+        if rospy.is_shutdown():
             return
 
         rospy.logdebug("STATUS MSG: " + msg.path)
