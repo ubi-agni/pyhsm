@@ -110,3 +110,7 @@ class SubscriptionManager(object):
                 self._viewer.needs_graph_update = True
                 self._viewer.needs_tree_update = True
                 self._update_cond.notify_all()
+
+    def _unsubscribe(self, server_name):
+        # FIXME Implement this: Remove callbacks and update tree with removed nodes.
+        pass
