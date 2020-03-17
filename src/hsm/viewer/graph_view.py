@@ -38,7 +38,7 @@ class GraphViewToolbar(HorizontalToolbar):
         """Create all GUI elements and add them to the toolbar."""
         # Path filter combo box
         self.add(geb.build_label('Filter: '))
-        self.path_filter_combo = geb.build_combo_box(model)
+        self.path_filter_combo = geb.build_combo_box(model, has_entry=True)
         self.add(self.path_filter_combo)
 
         # Depth spin button

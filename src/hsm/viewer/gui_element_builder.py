@@ -41,13 +41,13 @@ def build_button(label=None, icon=None, tooltip=None, type=Gtk.Button):
     return button
 
 
-def build_combo_box(model=None):
-    combo_box = Gtk.ComboBox.new()
-    combo_box.set_model(model)
-    # FIXME We want these to be like a `Gtk.TreeView` (everything shown by default);
-    #       instead they are menu-like
-    # FIXME How to set style properties?
-    # combo_box.set_property('appears_as_list', True)
+def build_combo_box(model, **kwargs):
+    combo_box = Gtk.ComboBox(model=model, **kwargs)
+
+    # configure combobox style to be list-like (instead of menu-like)
+    css = Gtk.CssProvider()
+    css.load_from_data("* { -GtkComboBox-appears-as-list: True; }")
+    combo_box.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
     renderer = Gtk.CellRendererText()
     renderer.set_property('weight_set', True)
