@@ -95,8 +95,12 @@ class Oven(StateMachine):
 
 
 if __name__ == '__main__':
-    prefix = sys.argv[1] if len(sys.argv) > 1 else ''
-    rospy.init_node('oven' + prefix, anonymous=True)
+    argv = rospy.myargv(sys.argv)  # filter-out remapping args
+    prefix = argv[1] if len(argv) > 1 else ''  # use 1st positional argument as prefix
+
+    # use an anonymous node name if a prefix is used, but no node name remapping defined
+    anonymous = len(prefix) and len(rospy.names.get_mappings().get('__name', 'empty'))
+    rospy.init_node('oven', anonymous=bool(anonymous))
 
     # enable logging
     logger = logging.getLogger("hsm")
@@ -106,5 +110,5 @@ if __name__ == '__main__':
     oven = Oven()
     sis = IntrospectionServer(rospy.get_name(), oven, prefix)
     sis.start()
-    raw_input("Press a key to quit")
+    rospy.spin()
     sis.stop()
