@@ -52,7 +52,9 @@ def build_combo_box(model, **kwargs):
     renderer = Gtk.CellRendererText()
     renderer.set_property('weight_set', True)
     combo_box.pack_start(renderer, True)
-    combo_box.set_cell_data_func(renderer, model.render_path)
+    combo_box.add_attribute(renderer, 'text', model.LABEL)
+    combo_box.add_attribute(renderer, 'weight', model.WEIGHT)
+    combo_box.add_attribute(renderer, 'sensitive', model.ENABLED)
 
     return combo_box
 

@@ -8,9 +8,14 @@ class TreeView(Gtk.TreeView):
         """Initialize the tree view, enabling bold text."""
         Gtk.TreeView.__init__(self, model, *args, **kwargs)
 
-        # Enable bold text
+        # Configure rendering: display label as text, use weight
         renderer = Gtk.CellRendererText()
-        renderer.set_property('weight_set', True)
-        column = Gtk.TreeViewColumn('Path', renderer)
-        column.set_cell_data_func(renderer, model.render_path)
+        column = Gtk.TreeViewColumn('Path', renderer, text=model.LABEL, sensitive=model.ENABLED, weight=model.WEIGHT)
+        column.set_sort_column_id(model.LABEL)  # sort by label
         self.append_column(column)
+
+        # Disable selection of disabled rows
+        selection = self.get_selection()
+        def select_function(selection, model, path, *args):
+            return model[path][model.ENABLED]
+        selection.set_select_function(select_function)

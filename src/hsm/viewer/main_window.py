@@ -24,20 +24,18 @@ class MainWindow(Gtk.Window):
 
         self.update_cond = threading.Condition()
         self.needs_graph_update = False
-        self.needs_tree_update = False
 
         # Backend
         self.state_tree_model = StateTreeModel()  # Tree store containing the containers
-        self.hsms = {}  # Dictionary from server names to ``RootStateNode``s
-
-        # Start thread: get servers, then get structure msgs, then get state msgs.
-        self.subscription_manager = SubscriptionManager(self)
 
         # Frontend
         self.__setup_gui_elements()
         self.show_all()
         # Revert the ``no_show_all`` behavior so the tree is hidden in case we call ``hide_all``.
         self.tree_view.set_no_show_all(False)
+
+        # Start serving: retrieve servers, subscribe to structure and state msgs
+        self.subscription_manager = SubscriptionManager(self)
 
     def __setup_gui_elements(self):
         """Create all GUI elements and add them to the window."""
@@ -46,7 +44,7 @@ class MainWindow(Gtk.Window):
         # Prepare graph and tree view
         self.graph_view = GraphView(self.state_tree_model)  # Graph view including its toolbar
         self.tree_view = TreeView(self.state_tree_model)  # Tree view of all paths
-        self.tree_view.set_no_show_all(True)
+        self.graph_view.set_no_show_all(True)  # Don't show this widget with show_all()
         self.main_toolbar = MainToolbar(self)  # main toolbar
 
         # Add elements in correct order
