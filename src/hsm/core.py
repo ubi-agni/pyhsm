@@ -364,18 +364,20 @@ class Container(State):
         self.HISTORY = _History(self)
 
     def __getitem__(self, key):
-        if isinstance(key, State):
-            return key
-
         def find_by_name(name):
             for state in self.states:
                 if state.name == name:
                     return state
-            return None
 
-        keys = key.split('.', 1)
-        state = find_by_name(keys[0])
-        return state if len(keys) == 1 else state[keys[1]]
+        # TODO: Unify separator character with introspection, which uses '/'
+        state = self
+        keys = [None, key]
+        while state is not None and len(keys) > 1:
+            keys = keys[1].split('.', 1)
+            state = find_by_name(keys[0])
+        if state is None:
+            raise IndexError('Unknown state {}'.format(key))
+        return state
 
     def add_state(self, state, initial=False):
         """Add a state to a state the container.
@@ -435,7 +437,9 @@ class Container(State):
 
     def add_transition(self, events, target_state, *args, **kwargs):
         # handle string names: retrieve State instances
-        super(Container, self).add_transition(events, self[target_state], *args, **kwargs)
+        if not isinstance(target_state, State):
+            target_state = self[target_state]
+        super(Container, self).add_transition(events, target_state, *args, **kwargs)
 
     @property
     def leaf_state(self):
@@ -555,6 +559,10 @@ class StateMachine(Container):
     def register_transition_cb(self, transition_cb, *args):
         """Adds a transition callback to this container."""
         self._transition_cbs.append((transition_cb, args))
+
+    def unregister_transition_cb(self, transition_cb, *args):
+        """Adds a transition callback to this container."""
+        self._transition_cbs.remove((transition_cb, args))
 
     def call_transition_cbs(self, from_state, to_state):
         """Calls the registered transition callbacks.
