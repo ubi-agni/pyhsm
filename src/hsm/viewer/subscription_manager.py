@@ -1,4 +1,5 @@
 from threading import Thread
+from gtk_wrap import GObject
 
 import rospy
 import pyhsm_msgs.msg as msgs
@@ -54,12 +55,12 @@ class SubscriptionManager(object):
         self._structure_subs[server_name] = rospy.Subscriber(
             server_name + introspection.STRUCTURE_TOPIC,
             msgs.HsmStructure,
-            callback=self._build_and_status_sub,
-            callback_args=server_name,
+            # process message synchronously in GUI thread
+            callback=lambda msg: GObject.idle_add(self._process_structure_msg, msg, server_name),
             queue_size=50,
         )
 
-    def _build_and_status_sub(self, msg, server_name):
+    def _process_structure_msg(self, msg, server_name):
         """Build the tree as given by the ``HsmStructure`` message and subscribe to the server's status messages."""
         if rospy.is_shutdown():
             return
@@ -86,12 +87,12 @@ class SubscriptionManager(object):
         self._status_subs[root.server_name] = rospy.Subscriber(
             root.server_name + introspection.STATUS_TOPIC,
             msgs.HsmCurrentState,
-            callback=self._update_status,
-            callback_args=root,
+            # process message synchronously in GUI thread
+            callback=lambda msg: GObject.idle_add(self._process_status_msg, msg, root),
             queue_size=50,
         )
 
-    def _update_status(self, msg, root):
+    def _process_status_msg(self, msg, root):
         """Update the tree using the given ``HsmCurrentState`` message."""
         if rospy.is_shutdown():
             return
@@ -99,10 +100,8 @@ class SubscriptionManager(object):
         rospy.logdebug("STATUS MSG: " + msg.path)
 
         with self._update_cond:
-            needs_update = self._state_tree_model.update_current_state(msg, root)
-
-            if needs_update:
-                self._viewer.needs_graph_update = True
+            self._viewer.needs_graph_update = self._state_tree_model.update_current_state(msg, root)
+            if self._viewer.needs_graph_update:
                 self._update_cond.notify_all()
 
     def _unsubscribe(self, server_name):

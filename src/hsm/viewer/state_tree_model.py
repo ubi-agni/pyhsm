@@ -263,7 +263,6 @@ class StateTreeModel(Gtk.TreeStore):
         root_state.current = None if new_current is None else self.state(new_current)
 
         if changed:
-            # TODO: Gtk doesn't always seem to update the views if the weight changes
             if new_current is not None:
                 self.set_value(new_current, self.WEIGHT, Pango.Weight.BOLD)
             if old_current is not None:
