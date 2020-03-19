@@ -1,11 +1,12 @@
 import rospy
 import rostopic
-from std_msgs.msg import String
-
 import hsm
+
+from std_msgs.msg import String
 from pyhsm_msgs.msg import HsmStructure, HsmState, HsmCurrentState, HsmTransition
 
-__all__ = ['IntrospectionClient', 'IntrospectionServer']
+__all__ = ['IntrospectionClient', 'IntrospectionServer',
+           'STATUS_TOPIC', 'STRUCTURE_TOPIC', 'TRANSITION_TOPIC', 'EVENT_TOPIC']
 
 # Topic names
 STATUS_TOPIC = '/current_state'
@@ -17,14 +18,21 @@ EVENT_TOPIC = '/event'
 HISTORY_TRANSITION_MAGIC_WORD = '__HISTORY'
 
 
-class IntrospectionClient():
-    def get_servers(self):
+class IntrospectionClient(object):
+    @staticmethod
+    def get_servers():
         """Get the base names that are broadcasting HSM structures."""
         topics = rostopic.find_by_type(HsmStructure._type)
         return [t[:t.rfind(STRUCTURE_TOPIC)] for t in topics]
 
+    @staticmethod
+    def subscribe(server_name, callback, queue_size=50, **kwargs):
+        """Subscribe to a new structure messaging server."""
+        return rospy.Subscriber(server_name + STRUCTURE_TOPIC, HsmStructure,
+                                callback=callback, queue_size=queue_size, **kwargs)
 
-class IntrospectionServer():
+
+class IntrospectionServer(object):
     """Server for providing introspection and control for an HSM."""
 
     def __init__(self, server_name, machine, prefix):
