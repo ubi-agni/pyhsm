@@ -5,7 +5,6 @@ class TreeView(Gtk.TreeView):
     """Tree view of all paths. Enables advanced interaction such as transition triggering."""
 
     def __init__(self, model, *args, **kwargs):
-        """Initialize the tree view, enabling bold text."""
         Gtk.TreeView.__init__(self, model, *args, **kwargs)
 
         # Configure rendering: display label as text, use weight
