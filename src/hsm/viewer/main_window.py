@@ -9,7 +9,7 @@ from state_tree_model import StateTreeModel
 from ..introspection import *
 from tree_view import TreeView
 from pyhsm_msgs.msg import HsmStructure, HsmCurrentState, HsmTransition
-
+from std_msgs.msg import String
 
 
 class Subscription(object):
@@ -69,6 +69,16 @@ class MainWindow(Gtk.Window):
         self.__add_to(root_vbox, self.graph_view, expand=True)
         self.__add_to(root_vbox, self.tree_view, expand=True)
 
+        ### Connect signals
+        # link tree view selection to path combobox
+        self.main_toolbar.path_combo.connect('changed', self.on_path_combo_changed)
+        selection = self.tree_view.get_selection()
+        selection.connect('changed', self.on_tree_selection_changed)
+
+        # trigger state transition on double-click in tree view or on trigger_transition_button
+        self.tree_view.connect('row-activated', self.on_trigger_transition)
+        self.main_toolbar.trigger_transition_button.connect('clicked', self.on_trigger_transition)
+
     @staticmethod
     def __add_to(parent, child, expand=False):
         """Add the given child to the given parent. If the parent is a ``Gtk.Box``,
@@ -78,6 +88,35 @@ class MainWindow(Gtk.Window):
         else:
             parent.add(child)
         return child
+
+    ### GUI event handlers
+
+    def on_path_combo_changed(self, combo):
+        # enable trigger transition button depending on selection
+        model = combo.get_model()
+        item = combo.get_active_iter()
+        if item is None:  # content was changed by typing
+            entry = combo.get_child()
+            text = entry and entry.get_text()
+            item = text and model.find_node(text)
+            item and combo.set_active_iter(item)
+        self.main_toolbar.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
+
+    def on_tree_selection_changed(self, selection):
+        model, item = selection.get_selected()
+        if item is not None:
+            self.main_toolbar.set_path(item)
+
+    def on_trigger_transition(self, source, *args):
+        if isinstance(source, Gtk.Button):
+            item = self.main_toolbar.path_combo.get_active_iter()
+        elif isinstance(source, Gtk.TreeView):
+            path = args[0]
+            item = source.get_model().get_iter(path)
+        if item is not None:
+            root = self.tree_model.root_state(item)
+            path = self.tree_model.path(item)[len(root.prefix):]  # strip prefix from path
+            root.transition_publisher.publish(String(path))
 
     ### ROS connection / structure updates
 
@@ -143,6 +182,9 @@ class MainWindow(Gtk.Window):
         with self._update_cond:
             self._update_graph = self.tree_model.update_current_state(msg, root_state)
             if self._update_graph:
+                item = self.tree_model.find_node(root_state.prefix + msg.path)
+                if item is not None:
+                    self.main_toolbar.set_path(item, reason=self.main_toolbar.AUTO)
                 self._update_cond.notify_all()
 
     def _update_list_model(self):
