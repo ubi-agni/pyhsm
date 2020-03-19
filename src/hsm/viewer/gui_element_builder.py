@@ -143,8 +143,3 @@ def build_paned_frame(label=None):
     frame = Gtk.Frame(label)
     frame.set_shadow_type(Gtk.ShadowType.IN)
     return frame
-
-
-def build_statusbar():
-    """Return a statusbar."""
-    return Gtk.Statusbar()

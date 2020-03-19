@@ -1,7 +1,7 @@
 import threading
 
 from gtk_wrap import Gtk
-from gui_element_builder import build_box, build_statusbar
+from gui_element_builder import build_box
 from graph_view import GraphView
 from main_toolbar import MainToolbar
 from state_tree_model import StateTreeModel
@@ -31,8 +31,7 @@ class MainWindow(Gtk.Window):
         # Frontend
         self.__setup_gui_elements()
         self.show_all()
-        # Revert the ``no_show_all`` behavior so the tree is hidden in case we call ``hide_all``.
-        self.tree_view.set_no_show_all(False)
+        self.main_toolbar.toggle_view()  # start with tree view for now
 
         # Start serving: retrieve servers, subscribe to structure and state msgs
         self.subscription_manager = SubscriptionManager(self)
@@ -44,14 +43,12 @@ class MainWindow(Gtk.Window):
         # Prepare graph and tree view
         self.graph_view = GraphView(self.state_tree_model)  # Graph view including its toolbar
         self.tree_view = TreeView(self.state_tree_model)  # Tree view of all paths
-        self.graph_view.set_no_show_all(True)  # Don't show this widget with show_all()
         self.main_toolbar = MainToolbar(self)  # main toolbar
 
         # Add elements in correct order
         self.__add_to(root_vbox, self.main_toolbar)
         self.__add_to(root_vbox, self.graph_view, expand=True)
         self.__add_to(root_vbox, self.tree_view, expand=True)
-        self.__add_to(root_vbox, build_statusbar())
 
     @staticmethod
     def __add_to(parent, child, expand=False):
