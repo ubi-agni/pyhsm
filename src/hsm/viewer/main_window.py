@@ -98,17 +98,35 @@ class MainWindow(Gtk.Window):
             # Don't update the list too often
             rospy.sleep(1.0)
 
-    def _remove_server(self, server_name):
-        # Unsubscribe from a structure messaging server
-        server = self._subs[server_name]
-        del self._subs[server_name]
+    def _remove_server(self, server_name, prefix):
+        """Handle removal of server_name"""
+        with self._update_cond:
+            server = self._subs[server_name]
+            server.status_sub.unregister()
+
+            # mark all root states as disabled
+            for root_state in server.roots:
+                root = self.state_tree_model.find_node(root_state.path)
+                root and self.state_tree_model.enable(root, False, recursive=True)
+
+            # remove all root states from model after 10s
+            def remove_states(states):
+                for state in states:
+                    root = self.state_tree_model.find_node(state.path)
+                    self.state_tree_model.remove(root)
+
+            GObject.timeout_add(10000, remove_states, server.roots)
+            server.roots = set()  # clear set
 
     def _process_structure_msg(self, msg, server_name):
         """Build the tree as given by the ``HsmStructure`` message and subscribe to the server's status messages."""
+        rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
         if rospy.is_shutdown():
             return
 
-        rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
+        if not msg.states:
+            self._remove_server(server_name, msg.prefix)
+            return
 
         with self._update_cond:
             server = self._subs[server_name]

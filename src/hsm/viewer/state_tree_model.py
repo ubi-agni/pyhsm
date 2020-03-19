@@ -232,6 +232,12 @@ class StateTreeModel(Gtk.TreeStore):
 
         return new_parent
 
+    def enable(self, item, value, recursive=False):
+        self.set_value(item, self.ENABLED, value)
+        if recursive:
+            for child in self.children(item):
+                self.enable(child, value, recursive)
+
     def update_current_state(self, msg, root_state):
         """Update the active state from the given ``HsmCurrentState`` message
 

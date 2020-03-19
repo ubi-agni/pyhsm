@@ -55,7 +55,7 @@ class IntrospectionServer(object):
             latch=True)
 
     def start(self):
-        self._publish_structure()
+        self.publish_structure()
         # publish transitions
         self._machine.register_transition_cb(self._transition_cb)
         self._transition_cb(None, self._machine.leaf_state)
@@ -72,6 +72,7 @@ class IntrospectionServer(object):
         del self._transition_sub
         del self._event_sub
         self._machine.unregister_transition_cb(self._transition_cb)
+        self.publish_structure([])  # unregister from viewer
 
     def _transition_cb(self, from_state, to_state):
         self._current = self._get_full_path(to_state)
@@ -108,10 +109,11 @@ class IntrospectionServer(object):
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
 
-    def _state_msgs(self):
+    @staticmethod
+    def _state_msgs(machine):
         """Traverse the state tree of the machine and collect messages for all states."""
         parent_hierarchy = []
-        node_stack = [self._machine]
+        node_stack = [machine]
         state_msgs = []
 
         while node_stack:
@@ -120,10 +122,10 @@ class IntrospectionServer(object):
                 node_stack.extend(node.states)  # schedule all children
 
             # Update path correctly; handle changing parent paths
-            self._update_parent_hierarchy_(parent_hierarchy, node)
+            IntrospectionServer._update_parent_hierarchy_(parent_hierarchy, node)
             path = '/'.join(map(lambda s: s.name, parent_hierarchy))
 
-            state_msg = self._state_msg(node, path)
+            state_msg = IntrospectionServer._state_msg(node, path)
             state_msgs.append(state_msg)
 
         return state_msgs
@@ -197,12 +199,14 @@ class IntrospectionServer(object):
 
         return transition_msgs
 
-    def _publish_structure(self):
+    def publish_structure(self, states=None):
         try:
-            self._structure_pub.publish(HsmStructure(self._prefix, self._state_msgs()))
-        except Exception:
+            if states is None:
+                states = self._state_msgs(self._machine)
+            self._structure_pub.publish(HsmStructure(self._prefix, states))
+        except Exception as e:
             if not rospy.is_shutdown():
-                rospy.logerr("Publishing HSM structure message failed.")
+                rospy.logerr("Publishing HSM structure message failed:\n" + str(e))
 
     def _publish_status(self):
         """Publish current state of this container."""
