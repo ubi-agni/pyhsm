@@ -41,6 +41,9 @@ class IntrospectionServer(object):
         self._prefix = prefix
         self._current = None
 
+        # Before ROS shutdown, call self.stop()
+        rospy.on_shutdown(self.stop)
+
         # Advertise structure publisher
         self._structure_pub = rospy.Publisher(
             name=server_name + STRUCTURE_TOPIC,
@@ -69,8 +72,11 @@ class IntrospectionServer(object):
             String, self._event_trigger_cb)
 
     def stop(self):
-        del self._transition_sub
-        del self._event_sub
+        try:
+            del self._transition_sub
+            del self._event_sub
+        except AttributeError:
+            return  # not started (or stopped)
         self._machine.unregister_transition_cb(self._transition_cb)
         self.publish_structure([])  # unregister from viewer
 
