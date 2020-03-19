@@ -41,7 +41,7 @@ def build_button(label=None, icon=None, tooltip=None, type=Gtk.Button):
     return button
 
 
-def build_combo_box(model, **kwargs):
+def build_combo_box(model, completion_model=None, **kwargs):
     combo_box = Gtk.ComboBox(model=model, **kwargs)
     combo_box.set_entry_text_column(model.PATH)  # required to display full path in text field
 
@@ -59,18 +59,9 @@ def build_combo_box(model, **kwargs):
     combo_box.add_attribute(renderer, 'sensitive', model.ENABLED)
 
     # configure completion for text field (entry)
-    if combo_box.get_has_entry():
-        def match(completion, key, item, column):
-            text = completion.get_model()[item][column].lower()
-            print key, ": ", text, text.startswith(key)
-            return text.startswith(key.lower())
-
-        completion = Gtk.EntryCompletion(model=model, inline_completion=True, minimum_key_length=2)
-        renderer = Gtk.CellRendererText()
-        completion.pack_start(renderer, True)
-        completion.add_attribute(renderer, 'text', model.PATH)
-        completion.set_match_func(match, model.PATH)
-
+    if combo_box.get_has_entry() and completion_model is not None:
+        completion = Gtk.EntryCompletion(model=completion_model, minimum_key_length=2, inline_completion=True)
+        completion.set_text_column(0)  # configures data column and renderer
         entry = combo_box.get_child()
         entry.set_completion(completion)
 

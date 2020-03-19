@@ -40,7 +40,8 @@ class MainWindow(Gtk.Window):
         self._update_graph = False
 
         # Backend
-        self.state_tree_model = StateTreeModel()  # Tree store containing the containers
+        self.tree_model = StateTreeModel()  # Tree store representing the state hierarchy
+        self.list_model = Gtk.ListStore(str)  # Flat model of the tree store
 
         # Frontend
         self.__setup_gui_elements()
@@ -59,8 +60,8 @@ class MainWindow(Gtk.Window):
         root_vbox = self.__add_to(self, build_box(4))  # top level vertical box
 
         # Prepare graph and tree view
-        self.graph_view = GraphView(self.state_tree_model)  # Graph view including its toolbar
-        self.tree_view = TreeView(self.state_tree_model)  # Tree view of all paths
+        self.graph_view = GraphView(self.tree_model)  # Graph view including its toolbar
+        self.tree_view = TreeView(self.tree_model)  # Tree view of all paths
         self.main_toolbar = MainToolbar(self)  # main toolbar
 
         # Add elements in correct order
@@ -112,12 +113,13 @@ class MainWindow(Gtk.Window):
 
         with self._update_cond:
             server = self._subs[server_name]
-            root = self.state_tree_model.update_tree(msg, server_name)
-            root_state = self.state_tree_model.root_state(root)
+            root = self.tree_model.update_tree(msg, server_name)
+            root_state = self.tree_model.root_state(root)
             server.roots.add(root_state)
+            self._update_list_model()
 
             # Expand new states
-            path = self.state_tree_model.get_path(root)
+            path = self.tree_model.get_path(root)
             self.tree_view.expand_to_path(path)  # expand tree to make root visible
             self.tree_view.expand_row(path, True)  # recursively expand root and its children
 
@@ -139,6 +141,19 @@ class MainWindow(Gtk.Window):
         rospy.logdebug("STATUS MSG: " + msg.path)
 
         with self._update_cond:
-            self._update_graph = self.state_tree_model.update_current_state(msg, root_state)
+            self._update_graph = self.tree_model.update_current_state(msg, root_state)
             if self._update_graph:
                 self._update_cond.notify_all()
+
+    def _update_list_model(self):
+        tree = self.tree_model
+        column = tree.PATH
+        list = self.list_model
+        list.clear()
+        def traverse(parent=None):
+            item = tree.iter_children(parent)
+            while item:
+                list.append(row=[tree[item][column]])
+                traverse(item)
+                item = tree.iter_next(item)
+        traverse()

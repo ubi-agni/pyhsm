@@ -20,7 +20,7 @@ class MainToolbar(HorizontalToolbar):
         self.add(self.toggle_view_button)
 
         self.add(geb.build_label(geb.LABEL_SPACER + 'Current Path: '))
-        self.path_combo = geb.build_combo_box(main_window.state_tree_model, has_entry=True)
+        self.path_combo = geb.build_combo_box(main_window.tree_model, main_window.list_model, has_entry=True)
         self.add(self.path_combo)
 
         self.add_spacer()
