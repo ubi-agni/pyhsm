@@ -38,6 +38,7 @@ class MainWindow(Gtk.Window):
 
         self._update_cond = threading.Condition()
         self._update_graph = False
+        self._keep_running = True
 
         # Backend
         self.state_tree_model = StateTreeModel()  # Tree store containing the containers
@@ -48,11 +49,14 @@ class MainWindow(Gtk.Window):
         self.main_toolbar.toggle_view()  # start with tree view for now
 
         # Start serving: retrieve servers, subscribe to structure and state msgs
+        self.connect('destroy', self._stop)
         self._update_servers_thread.start()
 
-    def __del__(self):
-        self.update_servers_thread.join()
-        Gtk.Window.__del__(self)
+    def _stop(self, *args):
+        with self._update_cond:
+            self._keep_running = False  # signal shutdown
+            self._update_cond.notify_all()
+        self._update_servers_thread.join()
 
     def __setup_gui_elements(self):
         """Create all GUI elements and add them to the window."""
@@ -82,8 +86,8 @@ class MainWindow(Gtk.Window):
 
     def _update_servers(self):
         """Periodically update the known HSM introspection servers."""
-        while not rospy.is_shutdown():
-            with self._update_cond:
+        with self._update_cond:
+            while self._keep_running and not rospy.is_shutdown():
                 # Update the server list
                 server_names = IntrospectionClient.get_servers()
 
@@ -95,8 +99,8 @@ class MainWindow(Gtk.Window):
                     s = Subscription(IntrospectionClient.subscribe(server_name, callback, callback_args=server_name))
                     self._subs[server_name] = s
 
-            # Don't update the list too often
-            rospy.sleep(1.0)
+                # Don't update the list too often
+                self._update_cond.wait(1.0)
 
     def _remove_server(self, server_name, prefix):
         """Handle removal of server_name"""

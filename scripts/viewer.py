@@ -23,4 +23,3 @@ if sys.platform != 'win32':
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 Gtk.main()
-rospy.signal_shutdown('finish on user request')
