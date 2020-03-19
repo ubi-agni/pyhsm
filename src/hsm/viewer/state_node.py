@@ -9,30 +9,34 @@ from gtk_wrap import GObject
 class StateNode(GObject.GObject):
     """A node representing a state in a HSM"""
 
-    def __init__(self, msg):
+    def __init__(self, msg, root):
         """Initialize a state node from the given ``HsmState`` message
 
         :type msg: msgs.HsmState
         """
         GObject.GObject.__init__(self)
-        self._msg = msg
+        assert isinstance(root, RootStateNode)
+        self.root = root
+        self._path = self.root.prefix + msg.path
+        self._initial = msg.initial
+        self._transitions = msg.transitions
 
     # HSM-related methods
 
     @property
     def path(self):
-        """Return the path of this node. The path does not contain the prefix."""
-        return self._msg.path
+        """Return the (full) path of this node, including a prefix from a root state"""
+        return self._path
 
     @property
     def initial(self):
         """Return the label of the initial child state of this node."""
-        return self._msg.initial
+        return self._initial
 
     @property
     def transitions(self):
         """Return a list of labels of other states that can be transitioned into from this node."""
-        return self._msg.transitions
+        return self._transitions
 
 
 class RootStateNode(StateNode):
@@ -40,10 +44,11 @@ class RootStateNode(StateNode):
 
     def __init__(self, msg, prefix, server_name):
         """Initialize a state node from the given ``HsmState`` message and other meta information."""
-        StateNode.__init__(self, msg)
         self._prefix = prefix
-        if not self._prefix or self._prefix[-1] != '/':
+        # Ensure _prefix has a trailing slash
+        if self._prefix and self._prefix[-1] != '/':
             self._prefix += '/'
+        StateNode.__init__(self, msg, self)  # initialize after _prefix!
         self._server_name = server_name
         self._transition_publisher = rospy.Publisher(server_name + introspection.TRANSITION_TOPIC, String, queue_size=1)
         self.current = None
@@ -70,6 +75,7 @@ class DummyStateNode(StateNode):
         """Initialize a dummy state node with the given path."""
         GObject.GObject.__init__(self)
         self._path = path
+        self.root = None
 
     @property
     def path(self):

@@ -15,60 +15,47 @@ class StateTreeModel(Gtk.TreeStore):
     """
     # column indexes of the model
     STATE = 0     # StateNode
-    ROOT = 1      # associated RootStateNode
+    PATH = 1      # full path
     LABEL = 2     # short name shown
     WEIGHT = 3    # font weight, indicating active state
     ENABLED = 4   # is item enabled for selection?
 
     def __init__(self):
         """Initialize an empty state tree model."""
-        Gtk.TreeStore.__init__(self, StateNode, RootStateNode, str, int, bool)
+        Gtk.TreeStore.__init__(self, StateNode, str, str, int, bool)
 
     def row(self, item):
         """Retrieve all row information for given tree item"""
         return [self.get_value(item, i) for i in range(5)]
 
-    def append(self, parent, state, root=None, label=None, weight=Pango.Weight.NORMAL):
-        if root is None:
-            if parent is not None:
-                root = self.root_state(parent)
-            elif not isinstance(state, DummyStateNode):
-                raise ValueError('undefined root')
-
-        if label is None:
-            if parent is not None:
-                parent_path = self.state(parent).path
-                path = state.path
-                assert(path.startswith(parent_path + '/'))
-                label = path[len(parent_path)+1:]
-            elif isinstance(state, DummyStateNode):
-                label = state.path
-            else:
-                raise ValueError('undefined label')
+    def append(self, parent, state, weight=Pango.Weight.NORMAL):
+        # Determine (short) display label
+        if parent is not None:
+            parent_path = self.state(parent).path
+            path = state.path
+            assert(path.startswith(parent_path + '/'))
+            # label is determined by stripping of parent's path from state.path
+            label = path[len(parent_path)+1:]
+        else:
+            label = state.path
 
         enabled = not isinstance(state, DummyStateNode)
 
-        return Gtk.TreeStore.append(self, parent, [state, root, label, weight, enabled])
+        return Gtk.TreeStore.append(self, parent, [state, state.path, label, weight, enabled])
+
+    def path(self, item):
+        return self.get_value(item, column=self.PATH)
 
     def label(self, item):
         return self.get_value(item, column=self.LABEL)
 
     def state(self, item):
-        """Retrieve ``StateNode`` of the given ``TreeIter``"""
+        """Retrieve ``StateNode`` of the given tree item"""
         return self.get_value(item, column=self.STATE)
 
     def root_state(self, item):
-        """Return the ``RootStateNode`` of the given ``TreeIter``."""
-        return self.get_value(item, column=self.ROOT)
-
-    def is_root_state(self, item):
-        return self.get_value(item, column=self.ROOT) is self.get_value(item, column=self.STATE)
-
-    def full_path(self, item, path=None):
-        """Return the full path of the given item, including the prefix."""
-        if path is None:
-            path = self.state(item).path
-        return self.root_state(item).prefix + path
+        """Return the ``RootStateNode`` of the given tree item."""
+        return self.get_value(item, column=self.STATE).root
 
     def children(self, parent=None):
         item = self.iter_children(parent)
@@ -137,7 +124,7 @@ class StateTreeModel(Gtk.TreeStore):
         root = self.find_node(msg.path, parent=parent, max_depth=0)
         if root is None:
             root_state = RootStateNode(msg, prefix, server_name)
-            root = self.append(parent, state=root_state, root=root_state, label=msg.path)
+            root = self.append(parent, state=root_state)
         else:
             root_state = self.state(root)
             if isinstance(root_state, RootStateNode):
@@ -145,7 +132,7 @@ class StateTreeModel(Gtk.TreeStore):
                     raise RuntimeError('server_name has changed: {} -> {}'.format(root_state.server_name, server_name))
             else:
                 if self.can_mount_at(root):
-                    raise RuntimeError('Failed to insert HSM root {} at state {}'.format(msg.path, self.full_path(root)))
+                    raise RuntimeError('Failed to insert HSM root {} at state {}'.format(msg.path, root_state.path))
                 # remove all children from root (in case of invalidated item)
                 for item in self.children(root):
                     self.remove(item)
@@ -153,7 +140,6 @@ class StateTreeModel(Gtk.TreeStore):
                 # create new RootStateNode and update
                 root_state = RootStateNode(msg, prefix, server_name)
                 self.set_value(root, self.STATE, root_state)
-                self.set_value(root, self.ROOT, root_state)
         return root
 
     def _create_state(self, msg, parent, root):
@@ -161,19 +147,21 @@ class StateTreeModel(Gtk.TreeStore):
 
         :arg possible_parent:
         """
-        # find actual parent, by traversing the tree upwards (from parent to root) until full_path matches
-        full_path = self.full_path(root, msg.path)
-        while not full_path.startswith(self.full_path(parent) + '/'):
+        # find actual parent, by traversing the tree upwards (from parent to root) until path matches
+        path = self.state(root).prefix + msg.path
+        parent_path = self.path(parent) + '/'
+        while not path.startswith(parent_path):
             if parent is root:
-                raise ValueError('Failed to find valid parent for state {}'.format(full_path))
+                raise ValueError('Failed to find valid parent for state {}'.format(path))
             parent = self.iter_parent(parent)
+            parent_path = self.path(parent) + '/'
 
-        tail = full_path[len(self.full_path(parent))+1:]
+        tail = path[len(parent_path):]
         existing = self.find_node(tail, parent, max_depth=0)
 
         if existing is None:
-            rospy.logdebug('CONSTRUCTING: ' + full_path)
-            return self.append(parent, StateNode(msg))
+            rospy.logdebug('CONSTRUCTING: ' + path)
+            return self.append(parent, StateNode(msg, self.root_state(root)))
         else:
             assert isinstance(existing, StateNode)
             # TODO Update existing node
@@ -249,15 +237,10 @@ class StateTreeModel(Gtk.TreeStore):
 
         :return whether the active state has changed
         """
-        root_path = root_state.prefix + root_state.path
-        root = self.find_node(root_path)
+        root = self.find_node(root_state.path)
         assert self.state(root) is root_state
 
-        if root_state.current is not None:
-            old_current = self.find_node(root_state.prefix + root_state.current.path)
-        else:
-            old_current = None
-
+        old_current = root_state.current and self.find_node(root_state.current.path)
         new_current = self.find_node(msg.path, self.iter_parent(root))
         changed = new_current != old_current
         root_state.current = None if new_current is None else self.state(new_current)
