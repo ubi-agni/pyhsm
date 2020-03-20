@@ -157,12 +157,22 @@ class MainWindow(Gtk.Window):
             # remove all root states from model after 10s
             def remove_states(states):
                 for state in states:
+                    self._invalidate_comboboxes(state.path)
                     root = self.tree_model.find_node(state.path)
                     self.tree_model.remove(root)
                 self._update_list_model()
 
             GObject.timeout_add(10000, remove_states, server.roots)
             server.roots = set()  # clear set
+
+    def _invalidate_comboboxes(self, state_path):
+        for combo in [self.main_toolbar.path_combo, self.graph_view.toolbar.path_filter_combo]:
+            item = combo.get_active_iter()
+            entry = combo.get_child()
+            text = (item and combo.get_model().path(item)) or (entry and entry.get_text())
+            if state_path == text or text.startswith(state_path + '/'):
+                combo.set_active_iter(None)
+                entry and entry.set_text('')
 
     def _process_structure_msg(self, msg, server_name):
         """Build the tree as given by the ``HsmStructure`` message and subscribe to the server's status messages."""
