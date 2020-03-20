@@ -43,6 +43,7 @@ class Gui(object):
         self.tree_view = builder.get_object('tree_view')
         self._configure_tree_view(self.tree_model)
         self.graph_view = GraphView(builder, self.tree_model)
+        self.graph_view.update()
 
         self.stack = builder.get_object('stack')
         setattr(self.stack, 'toggle_view_button', builder.get_object('toggle_view_button'))
@@ -232,6 +233,7 @@ class Gui(object):
             self.tree_view.expand_to_path(path)  # expand tree to make root visible
             self.tree_view.expand_row(path, True)  # recursively expand root and its children
 
+            self.graph_view.update()
             self._update_cond.notify_all()
 
         # Once we have the HSM's nodes, we can update its status
@@ -250,22 +252,24 @@ class Gui(object):
 
         with self._update_cond:
             changed = self.tree_model.update_current_state(msg, root_state)
-            if changed:
+            if changed and self.path_update_mode == self.AUTO:
+                # update current state in path combobox
                 item = self.tree_model.find_node(root_state.prefix + msg.path)
-                if item is not None and self.path_update_mode == self.AUTO:
+                if item is not None:
                     self.path_combo.set_active_iter(item)
                     self.path_update_mode = self.AUTO  # keep AUTO mode
-                self._update_cond.notify_all()
+            # TODO: use signals
+            self.graph_view.update_styles(self.tree_model)
 
     def _update_list_model(self):
         tree = self.tree_model
         column = tree.PATH
-        list = self.list_model
-        list.clear()
+        flat = self.list_model
+        flat.clear()
         def traverse(parent=None):
             item = tree.iter_children(parent)
             while item:
-                list.append(row=[tree[item][column]])
+                flat.append(row=[tree[item][column]])
                 traverse(item)
                 item = tree.iter_next(item)
         traverse()

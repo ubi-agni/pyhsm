@@ -110,10 +110,6 @@ class StateTreeModel(Gtk.TreeStore):
 
         return _find(first, path, max_depth)
 
-    # Dot code generation
-
-    # FIXME Base this on old ContainerNode dot code generation code (maybe new class?).
-
     # Structure message handling
 
     def update_tree(self, msg, server_name):
