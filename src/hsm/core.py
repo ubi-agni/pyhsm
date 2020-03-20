@@ -325,7 +325,6 @@ class State(object):
             _call(handler, e)
         elif transition is not None:
             sm = self.root
-            leaf_state_before = self.leaf_state
             to_state = transition['to_state']
             if isinstance(to_state, _History):
                 to_state = to_state.parent.history_state
@@ -334,7 +333,7 @@ class State(object):
             top_state = sm._exit_states(event, self, to_state)
             transition['action'](self, event)
             sm._enter_states(event, top_state, to_state)
-            sm.call_transition_cbs(leaf_state_before, self.leaf_state)
+            sm.call_transition_cbs(current, to_state)
             # Why is self.parent.leaf_state passed here?
             # transition['after'](self.parent.leaf_state, event)
             transition['after'](to_state, event)
@@ -365,18 +364,20 @@ class Container(State):
         self.HISTORY = _History(self)
 
     def __getitem__(self, key):
-        if isinstance(key, State):
-            return key
-
         def find_by_name(name):
             for state in self.states:
                 if state.name == name:
                     return state
-            return None
 
-        keys = key.split('.', 1)
-        state = find_by_name(keys[0])
-        return state if len(keys) == 1 else state[keys[1]]
+        # TODO: Unify separator character with introspection, which uses '/'
+        state = self
+        keys = [None, key]
+        while state is not None and len(keys) > 1:
+            keys = keys[1].split('.', 1)
+            state = find_by_name(keys[0])
+        if state is None:
+            raise IndexError('Unknown state {}'.format(key))
+        return state
 
     def add_state(self, state, initial=False):
         """Add a state to a state the container.
@@ -436,7 +437,9 @@ class Container(State):
 
     def add_transition(self, events, target_state, *args, **kwargs):
         # handle string names: retrieve State instances
-        super(Container, self).add_transition(events, self[target_state], *args, **kwargs)
+        if not isinstance(target_state, State):
+            target_state = self[target_state]
+        super(Container, self).add_transition(events, target_state, *args, **kwargs)
 
     @property
     def leaf_state(self):
@@ -556,6 +559,10 @@ class StateMachine(Container):
     def register_transition_cb(self, transition_cb, *args):
         """Adds a transition callback to this container."""
         self._transition_cbs.append((transition_cb, args))
+
+    def unregister_transition_cb(self, transition_cb, *args):
+        """Adds a transition callback to this container."""
+        self._transition_cbs.remove((transition_cb, args))
 
     def call_transition_cbs(self, from_state, to_state):
         """Calls the registered transition callbacks.
@@ -797,6 +804,7 @@ def run(sm, final_state):
     def _signal_handler(signum, frame):
         print(' Finishing on signal')
         sm._transition_to(final_state, event=None)
+        sm.dispatch(object())  # finish event_queue
 
     # install signal handler
     old_int_handler = signal.signal(signal.SIGINT, _signal_handler)
@@ -804,7 +812,7 @@ def run(sm, final_state):
 
     while not _finished():
         try:
-            event = event_queue.get(False, 0.1)
+            event = event_queue.get()
             sm._dispatch(event)
         except Queue.Empty:
             pass
