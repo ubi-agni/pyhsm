@@ -41,20 +41,29 @@ def build_button(label=None, icon=None, tooltip=None, type=Gtk.Button):
     return button
 
 
-def build_combo_box(model, **kwargs):
+def build_combo_box(model, completion_model=None, **kwargs):
     combo_box = Gtk.ComboBox(model=model, **kwargs)
+    combo_box.set_entry_text_column(model.PATH)  # required to display full path in text field
 
     # configure combobox style to be list-like (instead of menu-like)
     css = Gtk.CssProvider()
     css.load_from_data("* { -GtkComboBox-appears-as-list: True; }")
     combo_box.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
+    # configure (short) labels to be displayed in popup view
+    combo_box.clear()  # remove (full) path renderer added by set_entry_text_column()
     renderer = Gtk.CellRendererText()
-    renderer.set_property('weight_set', True)
     combo_box.pack_start(renderer, True)
     combo_box.add_attribute(renderer, 'text', model.LABEL)
     combo_box.add_attribute(renderer, 'weight', model.WEIGHT)
     combo_box.add_attribute(renderer, 'sensitive', model.ENABLED)
+
+    # configure completion for text field (entry)
+    if combo_box.get_has_entry() and completion_model is not None:
+        completion = Gtk.EntryCompletion(model=completion_model, minimum_key_length=2, inline_completion=True)
+        completion.set_text_column(0)  # configures data column and renderer
+        entry = combo_box.get_child()
+        entry.set_completion(completion)
 
     return combo_box
 

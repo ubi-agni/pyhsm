@@ -9,7 +9,7 @@ from state_tree_model import StateTreeModel
 from ..introspection import *
 from tree_view import TreeView
 from pyhsm_msgs.msg import HsmStructure, HsmCurrentState, HsmTransition
-
+from std_msgs.msg import String
 
 
 class Subscription(object):
@@ -41,7 +41,8 @@ class MainWindow(Gtk.Window):
         self._keep_running = True
 
         # Backend
-        self.state_tree_model = StateTreeModel()  # Tree store containing the containers
+        self.tree_model = StateTreeModel()  # Tree store representing the state hierarchy
+        self.list_model = Gtk.ListStore(str)  # Flat model of the tree store
 
         # Frontend
         self.__setup_gui_elements()
@@ -63,14 +64,24 @@ class MainWindow(Gtk.Window):
         root_vbox = self.__add_to(self, build_box(4))  # top level vertical box
 
         # Prepare graph and tree view
-        self.graph_view = GraphView(self.state_tree_model)  # Graph view including its toolbar
-        self.tree_view = TreeView(self.state_tree_model)  # Tree view of all paths
+        self.graph_view = GraphView(self.tree_model)  # Graph view including its toolbar
+        self.tree_view = TreeView(self.tree_model)  # Tree view of all paths
         self.main_toolbar = MainToolbar(self)  # main toolbar
 
         # Add elements in correct order
         self.__add_to(root_vbox, self.main_toolbar)
         self.__add_to(root_vbox, self.graph_view, expand=True)
         self.__add_to(root_vbox, self.tree_view, expand=True)
+
+        ### Connect signals
+        # link tree view selection to path combobox
+        self.main_toolbar.path_combo.connect('changed', self.on_path_combo_changed)
+        selection = self.tree_view.get_selection()
+        selection.connect('changed', self.on_tree_selection_changed)
+
+        # trigger state transition on double-click in tree view or on trigger_transition_button
+        self.tree_view.connect('row-activated', self.on_trigger_transition)
+        self.main_toolbar.trigger_transition_button.connect('clicked', self.on_trigger_transition)
 
     @staticmethod
     def __add_to(parent, child, expand=False):
@@ -81,6 +92,36 @@ class MainWindow(Gtk.Window):
         else:
             parent.add(child)
         return child
+
+    ### GUI event handlers
+
+    def on_path_combo_changed(self, combo):
+        model = combo.get_model()
+        item = combo.get_active_iter()
+        if item is None:  # content was changed by typing
+            # try to find existing item from text
+            entry = combo.get_child()
+            text = entry and entry.get_text()
+            item = text and model.find_node(text)
+            item and combo.set_active_iter(item)
+        # enable trigger transition button depending on selection
+        self.main_toolbar.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
+
+    def on_tree_selection_changed(self, selection):
+        model, item = selection.get_selected()
+        if item is not None:
+            self.main_toolbar.set_path(item)
+
+    def on_trigger_transition(self, source, *args):
+        if isinstance(source, Gtk.Button):
+            item = self.main_toolbar.path_combo.get_active_iter()
+        elif isinstance(source, Gtk.TreeView):
+            path = args[0]
+            item = source.get_model().get_iter(path)
+        if item is not None:
+            root = self.tree_model.root_state(item)
+            path = self.tree_model.path(item)[len(root.prefix):]  # strip prefix from path
+            root.transition_publisher.publish(String(path))
 
     ### ROS connection / structure updates
 
@@ -110,14 +151,15 @@ class MainWindow(Gtk.Window):
 
             # mark all root states as disabled
             for root_state in server.roots:
-                root = self.state_tree_model.find_node(root_state.path)
-                root and self.state_tree_model.enable(root, False, recursive=True)
+                root = self.tree_model.find_node(root_state.path)
+                root and self.tree_model.enable(root, False, recursive=True)
 
             # remove all root states from model after 10s
             def remove_states(states):
                 for state in states:
-                    root = self.state_tree_model.find_node(state.path)
-                    self.state_tree_model.remove(root)
+                    root = self.tree_model.find_node(state.path)
+                    self.tree_model.remove(root)
+                self._update_list_model()
 
             GObject.timeout_add(10000, remove_states, server.roots)
             server.roots = set()  # clear set
@@ -134,12 +176,13 @@ class MainWindow(Gtk.Window):
 
         with self._update_cond:
             server = self._subs[server_name]
-            root = self.state_tree_model.update_tree(msg, server_name)
-            root_state = self.state_tree_model.root_state(root)
+            root = self.tree_model.update_tree(msg, server_name)
+            root_state = self.tree_model.root_state(root)
             server.roots.add(root_state)
+            self._update_list_model()
 
             # Expand new states
-            path = self.state_tree_model.get_path(root)
+            path = self.tree_model.get_path(root)
             self.tree_view.expand_to_path(path)  # expand tree to make root visible
             self.tree_view.expand_row(path, True)  # recursively expand root and its children
 
@@ -161,6 +204,24 @@ class MainWindow(Gtk.Window):
         rospy.logdebug("STATUS MSG: " + msg.path)
 
         with self._update_cond:
-            self._update_graph = self.state_tree_model.update_current_state(msg, root_state)
+            self._update_graph = self.tree_model.update_current_state(msg, root_state)
             if self._update_graph:
+                toolbar = self.main_toolbar
+                item = self.tree_model.find_node(root_state.prefix + msg.path)
+                if item is not None and toolbar.path_update == MainToolbar.AUTO:
+                    toolbar.set_path(item)
+                    toolbar.path_update = MainToolbar.AUTO  # keep AUTO
                 self._update_cond.notify_all()
+
+    def _update_list_model(self):
+        tree = self.tree_model
+        column = tree.PATH
+        list = self.list_model
+        list.clear()
+        def traverse(parent=None):
+            item = tree.iter_children(parent)
+            while item:
+                list.append(row=[tree[item][column]])
+                traverse(item)
+                item = tree.iter_next(item)
+        traverse()
