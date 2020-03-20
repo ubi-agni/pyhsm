@@ -1,8 +1,11 @@
 from __future__ import print_function
+
+import pytest
 from hsm.core import StateMachine
 from hsm.introspection import IntrospectionServer
-from pyhsm_msgs.msg import HsmStructure
+from pyhsm_msgs.msg import HsmStructure, HsmState
 from hsm.viewer.state_tree_model import StateTreeModel
+from hsm.viewer.state_node import *
 
 
 def to_list(tree, parent=None, indent=0):
@@ -11,6 +14,21 @@ def to_list(tree, parent=None, indent=0):
         result.append('  ' * indent + tree.get_value(child, StateTreeModel.LABEL))
         result += to_list(tree, child, indent + 1)
     return result
+
+
+def test_dummy():
+    dummy = DummyStateNode('path')
+    with pytest.raises(AttributeError):
+        dummy.initial
+
+
+def test_update():
+    msg = HsmState(path='A', initial='i1')
+    state = RootStateNode(msg, '', '')
+    assert not state.update(msg)
+    msg = HsmState(path='A', initial='i2')
+    assert state.update(msg)
+    assert state.initial == 'i2'
 
 
 def test_dummy_splitting():

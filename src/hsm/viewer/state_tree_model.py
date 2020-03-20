@@ -145,7 +145,7 @@ class StateTreeModel(Gtk.TreeStore):
                 root_state = self.state(root)
                 if isinstance(root_state, RootStateNode):
                     if root_state.server_name == server_name:
-                        self._update_state(root_state, msg)
+                        self._update_state(root, root_state, msg)
                     elif parent is None:  # continue searching, eventually insert additional root state at top level
                         root = self.find_node(msg.path, first=root, max_depth=0)
                         continue
@@ -185,12 +185,14 @@ class StateTreeModel(Gtk.TreeStore):
             return self.append(parent, StateNode(msg, self.root_state(root)))
         else:
             state = self.state(existing)  # turn tree item into associated state
-            self._update_state(state, msg)
-            # TODO Update existing node
+            self._update_state(existing, state, msg)
             return existing
 
-    def _update_state(self, state, msg):
-         assert isinstance(state, StateNode)
+    def _update_state(self, item, state, msg):
+        """Update fields of state from msg."""
+        assert state is self.state(item)
+        if state.update(msg):
+            self.row_changed(self.get_path(self.item), self.item)
 
     def _create_or_split_dummy(self, path):
         """Return a (dummy) node for the given path.

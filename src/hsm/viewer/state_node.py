@@ -5,9 +5,12 @@ from std_msgs.msg import String
 from .. import introspection
 from gtk_wrap import GObject
 
+__all__ = ['StateNode', 'RootStateNode', 'DummyStateNode']
+
 
 class StateNode(GObject.GObject):
     """A node representing a state in a HSM"""
+    __slots__ = [slot for slot in msgs.HsmState.__slots__ if slot != 'path']
 
     def __init__(self, msg, root):
         """Initialize a state node from the given ``HsmState`` message
@@ -18,8 +21,10 @@ class StateNode(GObject.GObject):
         assert isinstance(root, RootStateNode)
         self.root = root
         self._path = self.root.prefix + msg.path
-        self._initial = msg.initial
-        self._transitions = msg.transitions
+
+        # store all slots from msg as instance properties
+        for slot in self.__slots__:
+            self.__setattr__(slot, getattr(msg, slot))
 
     # HSM-related methods
 
@@ -28,15 +33,15 @@ class StateNode(GObject.GObject):
         """Return the (full) path of this node, including a prefix from a root state"""
         return self._path
 
-    @property
-    def initial(self):
-        """Return the label of the initial child state of this node."""
-        return self._initial
-
-    @property
-    def transitions(self):
-        """Return a list of labels of other states that can be transitioned into from this node."""
-        return self._transitions
+    def update(self, msg):
+        """Update all msg slots and return True if there were any changes"""
+        changed = False
+        for slot in self.__slots__:
+            value = getattr(msg, slot)
+            if getattr(self, slot) != value:
+                setattr(self, slot, value)
+                changed = True
+        return changed
 
 
 class RootStateNode(StateNode):
@@ -74,18 +79,7 @@ class DummyStateNode(StateNode):
     def __init__(self, path):
         """Initialize a dummy state node with the given path."""
         GObject.GObject.__init__(self)
+        # Do NOT StateNode.__init__ to ensure that slots remain undefined
         self._path = path
         self.root = None
 
-    @property
-    def path(self):
-        """Return the path of this node. The path does not contain the prefix."""
-        return self._path
-
-    @property
-    def initial(self):
-        raise AttributeError('DummyStateNodes do not have an initial state.')
-
-    @property
-    def transitions(self):
-        raise AttributeError('DummyStateNodes do not have transitions.')
