@@ -123,33 +123,23 @@ class IntrospectionServer(object):
         state_msgs = []
 
         while node_stack:
-            node = node_stack.pop()
+            node = node_stack.pop()  # fetch nodes from the end of the stack
             if hasattr(node, 'states'):
-                node_stack.extend(node.states)  # schedule all children
+                # Schedule children in reverse order, to have correct parent_hierarchy!
+                node_stack.extend(reversed(node.states))
 
-            # Update path correctly; handle changing parent paths
-            IntrospectionServer._update_parent_hierarchy_(parent_hierarchy, node)
+            # Remove nodes from the tail of the list as long as they are not the node's parent
+            while parent_hierarchy and (node.parent is not parent_hierarchy[-1]):
+                del parent_hierarchy[-1]
+            # Finally, add the new node
+            parent_hierarchy.append(node)
+
             path = '/'.join(map(lambda s: s.name, parent_hierarchy))
 
             state_msg = IntrospectionServer._state_msg(node, path)
             state_msgs.append(state_msg)
 
         return state_msgs
-
-    @staticmethod
-    def _update_parent_hierarchy_(parent_hierarchy, node):
-        """Update the parent hierarchy in place according to the newly visited node."""
-        if not parent_hierarchy or node.parent is parent_hierarchy[-1]:
-            # If current node is child of previously visited node or if it
-            # is the first (root) node, add it to the parent hierarchy.
-            parent_hierarchy.append(node)
-        else:
-            # Otherwise, go up the chain until we find the direct parent...
-            while node.parent != parent_hierarchy[-1]:
-                del parent_hierarchy[-1]
-                # ... and add the current node to the hierarchy.
-            parent_hierarchy.append(node)
-        return parent_hierarchy
 
     @staticmethod
     def _state_msg(state, full_path):
