@@ -8,7 +8,6 @@ class MainToolbar(HorizontalToolbar):
     # enums describing reasons for path updates
     AUTO = 0
     USER = 1
-    RESET = 2
 
     def __init__(self, main_window, *args, **kwargs):
         """Initialize the toolbar, its GUI elements and the callbacks."""
@@ -27,6 +26,7 @@ class MainToolbar(HorizontalToolbar):
 
         self.add(geb.build_label(geb.LABEL_SPACER + 'State: '))
         self.path_combo = geb.build_combo_box(main_window.tree_model, main_window.list_model, has_entry=True)
+        self.path_combo.connect('changed', self._on_path_combo_changed)
         self.add(self.path_combo)
 
         self.add_spacer()
@@ -46,7 +46,14 @@ class MainToolbar(HorizontalToolbar):
         else:
             toggle(self.__graph_view_icon, self.__graph_view, self.__tree_view)
 
-    def set_path(self, item, reason=USER):
-        if reason != self.AUTO or self.path_update == self.AUTO:
-            self.path_combo.set_active_iter(item)
-            self.path_update = self.AUTO if reason == self.RESET else self.USER
+    def set_path(self, item):
+        self.path_combo.set_active_iter(item)
+
+    def _on_path_combo_changed(self, combo):
+        self.path_update = self.USER
+        item = combo.get_active_iter()
+        if item is None:  # content was changed by typing
+            entry = combo.get_child()
+            text = entry and entry.get_text()
+            if not text:  # empty text resets to AUTO mode
+                self.path_update = self.AUTO

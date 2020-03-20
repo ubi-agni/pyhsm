@@ -92,14 +92,15 @@ class MainWindow(Gtk.Window):
     ### GUI event handlers
 
     def on_path_combo_changed(self, combo):
-        # enable trigger transition button depending on selection
         model = combo.get_model()
         item = combo.get_active_iter()
         if item is None:  # content was changed by typing
+            # try to find existing item from text
             entry = combo.get_child()
             text = entry and entry.get_text()
             item = text and model.find_node(text)
             item and combo.set_active_iter(item)
+        # enable trigger transition button depending on selection
         self.main_toolbar.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
 
     def on_tree_selection_changed(self, selection):
@@ -182,9 +183,11 @@ class MainWindow(Gtk.Window):
         with self._update_cond:
             self._update_graph = self.tree_model.update_current_state(msg, root_state)
             if self._update_graph:
+                toolbar = self.main_toolbar
                 item = self.tree_model.find_node(root_state.prefix + msg.path)
-                if item is not None:
-                    self.main_toolbar.set_path(item, reason=self.main_toolbar.AUTO)
+                if item is not None and toolbar.path_update == MainToolbar.AUTO:
+                    toolbar.set_path(item)
+                    toolbar.path_update = MainToolbar.AUTO  # keep AUTO
                 self._update_cond.notify_all()
 
     def _update_list_model(self):
