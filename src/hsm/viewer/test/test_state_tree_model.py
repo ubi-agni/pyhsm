@@ -1,4 +1,7 @@
 from __future__ import print_function
+from hsm.core import StateMachine
+from hsm.introspection import IntrospectionServer
+from pyhsm_msgs.msg import HsmStructure
 from hsm.viewer.state_tree_model import StateTreeModel
 
 
@@ -23,6 +26,7 @@ def test_dummy_splitting():
     tree._create_or_split_dummy('a/b')
     assert to_list(tree) == ['a/b', '  c', '    d']
 
+
 def test_find():
     tree = StateTreeModel()
     for path in ['a1', 'a2', 'a3']:
@@ -40,3 +44,26 @@ def test_find():
         item = tree.find_node(path, parent=a2)
         assert item is not None
         assert tree.label(item) == label
+
+
+def mockup_machine():
+    m = StateMachine('machine')
+    m.add_states('A', 'B', 'C')
+    l = ['machine', '  A', '  B', '  C']
+    return m, l
+
+
+def test_find_next():
+    tree = StateTreeModel()
+    m, l = mockup_machine()
+    msg = HsmStructure(states = IntrospectionServer._state_msgs(m))
+
+    tree.update_tree(msg, 'server1')
+    assert to_list(tree) == l
+    tree.update_tree(msg, 'server1')
+    assert to_list(tree) == l
+
+    tree.update_tree(msg, 'server2')
+    assert to_list(tree) == l * 2
+    tree.update_tree(msg, 'server2')
+    assert to_list(tree) == l*2

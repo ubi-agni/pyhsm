@@ -69,8 +69,12 @@ class StateTreeModel(Gtk.TreeStore):
             return True  # outdated (disabled) normal node
         return self.iter_children(item) is None  # leaf node
 
-    def find_node(self, path, parent=None, max_depth=-1):
-        """Return the tree item matching given path, starting at parent item."""
+    def find_node(self, path, parent=None, first=None, max_depth=-1):
+        """Return the next tree item matching the given path.
+
+        If parent is given, *start* search with first child of parent.
+        If first is given, *continue* search with next child after first
+        """
         def _find(item, path, depth):
             """Find tree item with given path, starting from item."""
             while item is not None:
@@ -91,9 +95,20 @@ class StateTreeModel(Gtk.TreeStore):
                 # spurious or no match, continue on current level
                 item = self.iter_next(item)
 
-        if parent is None:
-            path = path.lstrip('/')  # remove leading slashes
-        return _find(self.iter_children(parent), path, max_depth)
+        path = path.lstrip('/')  # remove leading slashes
+
+        if first is None:  # start search from parent
+            if not path: return parent  # special case: path already empty -> can return parent
+            first = self.iter_children(parent)
+        elif parent is not None:
+            raise ValueError('Arguments parent and first are mutually exclusive.')
+        else:  # continue search from first
+            parent = self.iter_parent(first)
+            parent_path = parent and self.path(parent) or ''
+            path = path[len(parent_path):]  # strip path from first
+            first = self.iter_next(first)
+
+        return _find(first, path, max_depth)
 
     # Dot code generation
 
@@ -122,25 +137,31 @@ class StateTreeModel(Gtk.TreeStore):
     def _create_root_state(self, parent, msg, prefix, server_name):
         """Create or update a RootStateNode below parent according to msg"""
         root = self.find_node(msg.path, parent=parent, max_depth=0)
-        if root is None:
-            root_state = RootStateNode(msg, prefix, server_name)
-            root = self.append(parent, state=root_state)
-        else:
-            root_state = self.state(root)
-            if isinstance(root_state, RootStateNode):
-                if root_state.server_name != server_name:
-                    raise RuntimeError('server_name has changed: {} -> {}'.format(root_state.server_name, server_name))
-            else:
-                if self.can_mount_at(root):
-                    raise RuntimeError('Failed to insert HSM root {} at state {}'.format(msg.path, root_state.path))
-                # remove all children from root (in case of invalidated item)
-                for item in self.children(root):
-                    self.remove(item)
-
-                # create new RootStateNode and update
+        while True:
+            if root is None:
                 root_state = RootStateNode(msg, prefix, server_name)
-                self.set_value(root, self.STATE, root_state)
-        return root
+                root = self.append(parent, state=root_state)
+            else:
+                root_state = self.state(root)
+                if isinstance(root_state, RootStateNode):
+                    if root_state.server_name == server_name:
+                        self._update_state(root_state, msg)
+                    elif parent is None:  # continue searching, eventually insert additional root state at top level
+                        root = self.find_node(msg.path, first=root, max_depth=0)
+                        continue
+                    else:  # otherwise fail
+                        raise RuntimeError('server_name has changed: {} -> {}'.format(root_state.server_name, server_name))
+                else:
+                    if self.can_mount_at(root):
+                        raise RuntimeError('Failed to insert HSM root {} at state {}'.format(msg.path, root_state.path))
+                    # remove all children from root (in case of invalidated item)
+                    for item in self.children(root):
+                        self.remove(item)
+
+                    # update model with new RootStateNode
+                    root_state = RootStateNode(msg, prefix, server_name)
+                    self.set(root, self.STATE, root_state, self.ENABLED, True)
+            return root
 
     def _create_state(self, msg, parent, root):
         """Create or update a normal StateNode
@@ -163,9 +184,13 @@ class StateTreeModel(Gtk.TreeStore):
             rospy.logdebug('CONSTRUCTING: ' + path)
             return self.append(parent, StateNode(msg, self.root_state(root)))
         else:
-            assert isinstance(existing, StateNode)
+            state = self.state(existing)  # turn tree item into associated state
+            self._update_state(state, msg)
             # TODO Update existing node
             return existing
+
+    def _update_state(self, state, msg):
+         assert isinstance(state, StateNode)
 
     def _create_or_split_dummy(self, path):
         """Return a (dummy) node for the given path.
@@ -244,10 +269,17 @@ class StateTreeModel(Gtk.TreeStore):
         :return whether the active state has changed
         """
         root = self.find_node(root_state.path)
-        assert self.state(root) is root_state
+        while root and self.state(root) is not root_state:
+            root = self.find_node(root_state.path, first=root)
+        if root is None:
+            rospy.logerr('Invalidated root state "{}" ({}) for state update.'.
+                         format(root_state.path, root_state.server_name))
+            return False
 
-        old_current = root_state.current and self.find_node(root_state.current.path)
-        new_current = self.find_node(msg.path, self.iter_parent(root))
+        strip = len(root_state.path)
+        old_current = root_state.current and \
+                      self.find_node(root_state.current.path[strip:], parent=root)
+        new_current = self.find_node((root_state.prefix + msg.path)[strip:], parent=root)
         changed = new_current != old_current
         root_state.current = None if new_current is None else self.state(new_current)
 
