@@ -138,6 +138,8 @@ class Gui(object):
             else:
                 item = model.find_node(text)  # try to find item
             item and combo.set_active_iter(item)
+        else:
+            self.graph_view.set_selected(item)
         # enable trigger transition button depending on selection
         self.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
 

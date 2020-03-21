@@ -14,6 +14,7 @@ def hex2t(hex):
 
 
 class GraphView(object):
+    COLOR_SELECTED = hex2t('#FB000DFF')
     COLOR_ACTIVE = hex2t('#5C7600FF')
     COLOR_INACTIVE = hex2t('#808080FF')
 
@@ -24,6 +25,7 @@ class GraphView(object):
         self.model = model
         self._dotstr = ''
         self._label_wrapper = TextWrapper(break_long_words=True)
+        self._selected_id = None
 
         toolbar = builder.get_object('graph_toolbar')
         box = toolbar.get_parent()
@@ -62,6 +64,12 @@ class GraphView(object):
         root = state.root
         prefix = root and root.server_name + ':' or ''
         return prefix + state.path
+
+    def set_selected(self, item):
+        id = self.id(self.model.state(item))
+        if id != self._selected_id:
+            self._selected_id = id
+            self.update_styles(self.model)
 
     def dotcode(self, model):
         max_depth = self.depth_spinner.get_value_as_int()
@@ -165,6 +173,7 @@ class GraphView(object):
         linewidth = 4 if active else 2
         color = self.COLOR_ACTIVE if active else self.COLOR_INACTIVE
         fillcolor = self.FILL_ACTIVE if active else self.FILL_INACTIVE
+        if id == self._selected_id: color = self.COLOR_SELECTED
 
         for shape in self.dot_widget.graph.subgraph_shapes.get('cluster ' + id, []):
             pen = shape.pen
