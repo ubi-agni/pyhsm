@@ -1,13 +1,11 @@
 import threading
 import rospy
+import os
 
-from gtk_wrap import Gtk, GObject
-from gui_element_builder import build_box
-from graph_view import GraphView
-from main_toolbar import MainToolbar
+from . import *
 from state_tree_model import StateTreeModel
+from graph_view import GraphView
 from ..introspection import *
-from tree_view import TreeView
 from pyhsm_msgs.msg import HsmStructure, HsmCurrentState, HsmTransition
 from std_msgs.msg import String
 
@@ -19,105 +17,143 @@ class Subscription(object):
         self.roots = set()
 
 
-class MainWindow(Gtk.Window):
-    """
-    Main window of the HSM viewer containing the toolbar, graph and tree view.
-
-    Also handles some backend activities such as initializing the model and starting threads.
-    """
+class Gui(object):
+    # enums describing path_combo's update mode
+    AUTO = 0
+    USER = 1
 
     def __init__(self, width, height):
-        """Initialize the main window with its backend models as well as its GUI elements."""
-        Gtk.Window.__init__(self, title='HSM Viewer')
-
-        self.set_border_width(5)
-        self.set_default_size(width, height)
-
         self._subs = {}  # map from server_name to Subscription
         self._update_servers_thread = threading.Thread(target=self._update_servers)
 
         self._update_cond = threading.Condition()
-        self._update_graph = False
         self._keep_running = True
 
-        # Backend
+        # data model
         self.tree_model = StateTreeModel()  # Tree store representing the state hierarchy
         self.list_model = Gtk.ListStore(str)  # Flat model of the tree store
 
-        # Frontend
-        self.__setup_gui_elements()
-        self.show_all()
-        self.main_toolbar.toggle_view()  # start with tree view for now
+        # setup gui
+        self.path_update_mode = self.AUTO
+        builder = Gtk.Builder()
+        builder.add_from_file(os.path.join(os.path.dirname(__file__), 'gui', 'gui.glade'))
+
+        # fetch objects from builder
+        self.main = builder.get_object('main')
+        self.tree_view = builder.get_object('tree_view')
+        self._configure_tree_view(self.tree_model)
+        self.graph_view = GraphView(builder, self.tree_model)
+
+        self.stack = builder.get_object('stack')
+        setattr(self.stack, 'toggle_view_button', builder.get_object('toggle_view_button'))
+        for name in ['tree', 'graph']:  # store icons in child widgets with these names
+            setattr(self.stack.get_child_by_name(name), 'icon', builder.get_object(name + '_view_icon'))
+        self.toggle_view(view='graph')
+
+        self.trigger_transition_button = builder.get_object('trigger_transition_button')
+        self.path_combo = builder.get_object('path_combo')
+        self.filter_combo = builder.get_object('filter_combo')
+
+        # configure models
+        for combobox in [self.path_combo, self.filter_combo]:
+            self._configure_combo_box(combobox, self.tree_model, self.list_model)
+
+        self.main.set_default_size(width, height)
+        self._connect_signals(builder)
+        self.main.show_all()
 
         # Start serving: retrieve servers, subscribe to structure and state msgs
-        self.connect('destroy', self._stop)
         self._update_servers_thread.start()
 
-    def _stop(self, *args):
+    def _quit(self, *args):
         with self._update_cond:
             self._keep_running = False  # signal shutdown
             self._update_cond.notify_all()
         self._update_servers_thread.join()
+        Gtk.main_quit()
 
-    def __setup_gui_elements(self):
-        """Create all GUI elements and add them to the window."""
-        root_vbox = self.__add_to(self, build_box(4))  # top level vertical box
+    def _configure_tree_view(self, model):
+        self.tree_view.set_model(model)
 
-        # Prepare graph and tree view
-        self.graph_view = GraphView(self.tree_model)  # Graph view including its toolbar
-        self.tree_view = TreeView(self.tree_model)  # Tree view of all paths
-        self.main_toolbar = MainToolbar(self)  # main toolbar
+        # Configure rendering: display label as text, use weight
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn('Path', renderer, text=model.LABEL, sensitive=model.ENABLED, weight=model.WEIGHT)
+        column.set_sort_column_id(model.LABEL)  # sort by label
+        self.tree_view.append_column(column)
 
-        # Add elements in correct order
-        self.__add_to(root_vbox, self.main_toolbar)
-        self.__add_to(root_vbox, self.graph_view, expand=True)
-        self.__add_to(root_vbox, self.tree_view, expand=True)
-
-        ### Connect signals
-        # link tree view selection to path combobox
-        self.main_toolbar.path_combo.connect('changed', self.on_path_combo_changed)
+        # Disable selection of disabled rows
         selection = self.tree_view.get_selection()
-        selection.connect('changed', self.on_tree_selection_changed)
-
-        # trigger state transition on double-click in tree view or on trigger_transition_button
-        self.tree_view.connect('row-activated', self.on_trigger_transition)
-        self.main_toolbar.trigger_transition_button.connect('clicked', self.on_trigger_transition)
+        def select_function(selection, model, path, *args):
+            return model[path][model.ENABLED]
+        selection.set_select_function(select_function)
 
     @staticmethod
-    def __add_to(parent, child, expand=False):
-        """Add the given child to the given parent. If the parent is a ``Gtk.Box``,
-           the ``expand`` flag controls whether the added item will fill its space."""
-        if isinstance(parent, Gtk.Box):
-            parent.pack_start(child, expand, expand, 0)
-        else:
-            parent.add(child)
-        return child
+    def _configure_combo_box(combo, model, completion_model):
+        combo.set_model(model)
+        combo.set_entry_text_column(model.PATH)  # required to display full path in text field
+
+        # configure combobox style to be list-like (instead of menu-like)
+        css = Gtk.CssProvider()
+        css.load_from_data("* { -GtkComboBox-appears-as-list: True; }")
+        combo.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        # configure (short) labels to be displayed in popup view
+        combo.clear()  # remove (full) path renderer added by set_entry_text_column()
+        renderer = Gtk.CellRendererText()
+        combo.pack_start(renderer, True)
+        combo.add_attribute(renderer, 'text', model.LABEL)
+        combo.add_attribute(renderer, 'weight', model.WEIGHT)
+        combo.add_attribute(renderer, 'sensitive', model.ENABLED)
+
+        # configure completion for text field (entry)
+        if combo.get_has_entry() and completion_model is not None:
+            completion = Gtk.EntryCompletion(model=completion_model, minimum_key_length=2, inline_completion=True)
+            completion.set_text_column(0)  # configures data column and renderer
+            entry = combo.get_child()
+            entry.set_completion(completion)
+
+    def _connect_signals(self, builder):
+        builder.connect_signals(self)
 
     ### GUI event handlers
+
+    def toggle_view(self, *args, **kwargs):
+        stack = self.stack
+        view = kwargs.get('view', 'graph' if stack.get_visible_child_name() == 'tree' else 'tree')
+        stack.set_visible_child_name(view)
+        view = stack.get_visible_child()
+        stack.toggle_view_button.set_icon_widget(view.icon)
 
     def on_path_combo_changed(self, combo):
         model = combo.get_model()
         item = combo.get_active_iter()
+        self.path_update_mode = self.USER
         if item is None:  # content was changed by typing
             # try to find existing item from text
             entry = combo.get_child()
             text = entry and entry.get_text()
-            item = text and model.find_node(text)
+            if not text:  # empty text resets to AUTO mode
+                self.path_update_mode = self.AUTO
+            else:
+                item = model.find_node(text)  # try to find item
             item and combo.set_active_iter(item)
         # enable trigger transition button depending on selection
-        self.main_toolbar.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
+        self.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
 
     def on_tree_selection_changed(self, selection):
         model, item = selection.get_selected()
         if item is not None:
-            self.main_toolbar.set_path(item)
+            self.path_combo.set_active_iter(item)
 
     def on_trigger_transition(self, source, *args):
-        if isinstance(source, Gtk.Button):
-            item = self.main_toolbar.path_combo.get_active_iter()
-        elif isinstance(source, Gtk.TreeView):
+        if source == self.trigger_transition_button:
+            item = self.path_combo.get_active_iter()
+        elif source is self.tree_view:
             path = args[0]
             item = source.get_model().get_iter(path)
+        else:
+            raise TypeError('Unknown source: ' + str(source))
+
         if item is not None:
             root = self.tree_model.root_state(item)
             path = self.tree_model.path(item)[len(root.prefix):]  # strip prefix from path
@@ -166,7 +202,7 @@ class MainWindow(Gtk.Window):
             server.roots = set()  # clear set
 
     def _invalidate_comboboxes(self, state_path):
-        for combo in [self.main_toolbar.path_combo, self.graph_view.toolbar.path_filter_combo]:
+        for combo in [self.path_combo, self.filter_combo]:
             item = combo.get_active_iter()
             entry = combo.get_child()
             text = (item and combo.get_model().path(item)) or (entry and entry.get_text())
@@ -196,7 +232,6 @@ class MainWindow(Gtk.Window):
             self.tree_view.expand_to_path(path)  # expand tree to make root visible
             self.tree_view.expand_row(path, True)  # recursively expand root and its children
 
-            self._update_graph = True
             self._update_cond.notify_all()
 
         # Once we have the HSM's nodes, we can update its status
@@ -214,13 +249,12 @@ class MainWindow(Gtk.Window):
         rospy.logdebug("STATUS MSG: " + msg.path)
 
         with self._update_cond:
-            self._update_graph = self.tree_model.update_current_state(msg, root_state)
-            if self._update_graph:
-                toolbar = self.main_toolbar
+            changed = self.tree_model.update_current_state(msg, root_state)
+            if changed:
                 item = self.tree_model.find_node(root_state.prefix + msg.path)
-                if item is not None and toolbar.path_update == MainToolbar.AUTO:
-                    toolbar.set_path(item)
-                    toolbar.path_update = MainToolbar.AUTO  # keep AUTO
+                if item is not None and self.path_update_mode == self.AUTO:
+                    self.path_combo.set_active_iter(item)
+                    self.path_update_mode = self.AUTO  # keep AUTO mode
                 self._update_cond.notify_all()
 
     def _update_list_model(self):

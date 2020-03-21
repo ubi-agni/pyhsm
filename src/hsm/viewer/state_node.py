@@ -3,7 +3,7 @@ import rospy
 from std_msgs.msg import String
 
 from .. import introspection
-from gtk_wrap import GObject
+from . import GObject
 
 __all__ = ['StateNode', 'RootStateNode', 'DummyStateNode']
 

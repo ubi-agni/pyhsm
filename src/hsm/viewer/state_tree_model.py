@@ -3,7 +3,7 @@ from __future__ import print_function
 import rospy
 import pyhsm_msgs.msg as msgs
 
-from gtk_wrap import Gtk, Pango
+from . import *
 from state_node import DummyStateNode, RootStateNode, StateNode
 
 
