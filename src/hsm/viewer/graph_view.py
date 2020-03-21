@@ -13,6 +13,18 @@ def hex2t(hex):
     return [int(hex[i:i + 2], 16) / 255.0 for i in range(1, len(hex), 2)]
 
 
+class DotWidget(xdot.DotWidget):
+    """Customized DotWidget overriding some virtual methods"""
+    def __init__(self, *args, **kwargs):
+        xdot.DotWidget.__init__(self, *args, **kwargs)
+
+    def on_click(self, element, event):
+        if event.button == 1:
+            url = self.get_url(event.x, event.y)
+            if url is not None:
+                self.emit('clicked', url.url, event)
+        return True  # mark event as processed
+
 class GraphView(object):
     COLOR_SELECTED = hex2t('#FB000DFF')
     COLOR_ACTIVE = hex2t('#5C7600FF')
@@ -29,7 +41,7 @@ class GraphView(object):
 
         toolbar = builder.get_object('graph_toolbar')
         box = toolbar.get_parent()
-        self.dot_widget = xdot.DotWidget()
+        self.dot_widget = DotWidget()
         box.pack_start(self.dot_widget, expand=True, fill=True, padding=0)
 
         # HACK Unfortunately, builder.connect_signals() can only connect to a single class
@@ -79,6 +91,7 @@ class GraphView(object):
         def hierarchy(item, depth=0):
             state = model.state(item)
             label = model.label(item)
+            id = self.id(state)
 
             # recursively process children
             children = ''
@@ -103,9 +116,9 @@ class GraphView(object):
 {indent}subgraph "cluster {id}" {{ {cluster_attrs}
 {indent}\t"__S {id}" [{node_attrs}]
 {children}
-{indent}}}'''.format(indent='\t' * (depth + 1), id=self.id(state), label=label, children=children,
+{indent}}}'''.format(indent='\t' * (depth + 1), id=id, label=label, children=children,
                      cluster_attrs=format_attrs(**attrs),
-                     node_attrs=format_attrs(label='\\n'.join(wrapper.wrap(label))), url=state.path)
+                     node_attrs=format_attrs(label='\\n'.join(wrapper.wrap(label)), URL=id))
 
         # Generate state hierarchy H
         if model.iter_children() is None:

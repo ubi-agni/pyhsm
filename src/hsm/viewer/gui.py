@@ -115,6 +115,21 @@ class Gui(object):
 
     def _connect_signals(self, builder):
         builder.connect_signals(self)
+        self.graph_view.dot_widget.connect('clicked', self.on_graph_selection_changed)
+
+    def root_state_from_id(self, id):
+        """Retrieve root state from given graph id"""
+        for sub in self._subs.itervalues():
+            for root in sub.roots:
+                if id.startswith(root.server_name + ':' + root.prefix):
+                    return root
+
+    def item_from_id(self, id):
+        """Retrieve tree item from given graph id"""
+        root_state = self.root_state_from_id(id)
+        root = self.tree_model.root_from_root_state(root_state)
+        strip = len(self.graph_view.id(root_state))
+        return root and self.tree_model.find_node(id[strip:], parent=root)
 
     ### GUI event handlers
 
@@ -142,6 +157,10 @@ class Gui(object):
             self.graph_view.set_selected(item)
         # enable trigger transition button depending on selection
         self.trigger_transition_button.set_sensitive(item and model[item][model.ENABLED] or False)
+
+    def on_graph_selection_changed(self, widget, url, event):
+        item = self.item_from_id(url)
+        item and self.tree_view.get_selection().select_path(self.tree_model.get_path(item))
 
     def on_tree_selection_changed(self, selection):
         model, item = selection.get_selected()

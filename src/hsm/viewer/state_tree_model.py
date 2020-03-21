@@ -261,14 +261,19 @@ class StateTreeModel(Gtk.TreeStore):
             for child in self.children(item):
                 self.enable(child, value, recursive)
 
+    def root_from_root_state(self, root_state):
+        root = self.find_node(root_state.path)
+        while root and self.state(root) is not root_state:
+            root = self.find_node(root_state.path, first=root)
+        return root
+
+
     def update_current_state(self, msg, root_state):
         """Update the active state from the given ``HsmCurrentState`` message
 
         :return whether the active state has changed
         """
-        root = self.find_node(root_state.path)
-        while root and self.state(root) is not root_state:
-            root = self.find_node(root_state.path, first=root)
+        root = self.root_from_root_state(root_state)
         if root is None:
             rospy.logerr('Invalidated root state "{}" ({}) for state update.'.
                          format(root_state.path, root_state.server_name))
