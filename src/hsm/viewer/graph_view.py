@@ -4,13 +4,18 @@ from textwrap import TextWrapper
 from state_node import RootStateNode, DummyStateNode
 
 
-def format_attrs(join=', ', **kwargs):
+def format_attrs(join='; ', **kwargs):
     return join.join(['{key}="{value}"'.format(key=k, value=v) for k,v in kwargs.iteritems()])
 
 
-def hex2t(hex):
-    """Convert a hexadecimal color string into a 4-tuple."""
+def hex2c(hex):
+    """Convert a hexadecimal color string into a color 4-tuple."""
     return [int(hex[i:i + 2], 16) / 255.0 for i in range(1, len(hex), 2)]
+
+
+def c2hex(color):
+    """Convert a hexadecimal color string into a 4-tuple."""
+    return '#' + ''.join(map(lambda c: '%0.2X' % int(c*255), color))
 
 
 class DotWidget(xdot.DotWidget):
@@ -25,17 +30,19 @@ class DotWidget(xdot.DotWidget):
                 self.emit('clicked', url.url, event)
         return True  # mark event as processed
 
-class GraphView(object):
-    COLOR_SELECTED = hex2t('#FB000DFF')
-    COLOR_ACTIVE = hex2t('#5C7600FF')
-    COLOR_INACTIVE = hex2t('#808080FF')
+    def error_dialog(self, error):
+        pass
 
-    FILL_ACTIVE = hex2t('#C0F700FF')
-    FILL_INACTIVE =hex2t('#FFFFFFFF')
+class GraphView(object):
+    COLOR_SELECTED = hex2c('#FB000DFF')
+    COLOR_ACTIVE = hex2c('#5C7600FF')
+    COLOR_INACTIVE = hex2c('#808080FF')
+
+    FILL_ACTIVE = hex2c('#C0F700FF')
+    FILL_INACTIVE = hex2c('#FFFFFFFF')
 
     def __init__(self, builder, model):
         self.model = model
-        self._dotstr = ''
         self._label_wrapper = TextWrapper(break_long_words=True)
         self._selected_id = None
 
@@ -68,7 +75,7 @@ class GraphView(object):
             dlg.set_current_name('hsm.dot')
         if dlg.run() == Gtk.ResponseType.ACCEPT:
             with open(dlg.get_filename(), 'w') as file:
-                file.write(self._dotstr)
+                file.write(self.dotcode(self.model))
         dlg.hide()
 
     @staticmethod
@@ -89,10 +96,6 @@ class GraphView(object):
         wrapper.width = self.label_width_spinner.get_value_as_int()
 
         def hierarchy(item, depth=0):
-            state = model.state(item)
-            label = model.label(item)
-            id = self.id(state)
-
             # recursively process children
             children = ''
             if max_depth == -1 or depth < max_depth:
@@ -100,17 +103,22 @@ class GraphView(object):
                     children += hierarchy(child, depth+1)
 
             # process current item
-            attrs = dict()
+            state = model.state(item)
+            if isinstance(state, DummyStateNode):
+                return children  # skip dummy nodes
+
+            label = model.label(item)
+            id = self.id(state)
+            active = model.get_value(item, model.WEIGHT) > Pango.Weight.NORMAL
+            color, fillcolor, linewidth = self.get_style(active)
+            attrs = dict(style='filled,setlinewidth({})'.format(linewidth), color=c2hex(color), fillcolor=c2hex(fillcolor))
             if isinstance(state, RootStateNode):
-                attrs.update(style='filled')
                 parent = model.iter_parent(item)
                 parent = parent and model.state(parent)
                 if isinstance(parent, DummyStateNode):
                     label = parent.path + '/' + label  # prepend dummy's path
-            elif isinstance(state, DummyStateNode):
-                return children  # skip dummy nodes
             else:
-                attrs.update(style='filled,rounded')
+                attrs.update(style=attrs['style'] + ',rounded')
 
             return '''
 {indent}subgraph "cluster {id}" {{ {cluster_attrs}
@@ -151,8 +159,7 @@ class GraphView(object):
 }}'''.format(hierarchy=H, global_opts=global_opts)
 
     def update(self, *args):
-        self._dotstr = self.dotcode(self.model)
-        self.dot_widget.set_dotcode(self._dotstr)
+        self.dot_widget.set_dotcode(self.dotcode(self.model))
         self.update_styles(self.model)
         self.zoom_to_fit()
 
@@ -176,16 +183,21 @@ class GraphView(object):
 
         self.dot_widget.queue_draw()
 
+    @staticmethod
+    def get_style(active):
+        color = GraphView.COLOR_ACTIVE if active else GraphView.COLOR_INACTIVE
+        fillcolor = GraphView.FILL_ACTIVE if active else GraphView.FILL_INACTIVE
+        linewidth = 4 if active else 2
+        return color, fillcolor, linewidth
+
     def update_style(self, model, item):
         state = model.state(item)
         if isinstance(state, DummyStateNode):
             return  # skip dummy nodes
 
-        id = self.id(state)
         active = model.get_value(item, model.WEIGHT) > Pango.Weight.NORMAL
-        linewidth = 4 if active else 2
-        color = self.COLOR_ACTIVE if active else self.COLOR_INACTIVE
-        fillcolor = self.FILL_ACTIVE if active else self.FILL_INACTIVE
+        color, fillcolor, linewidth = self.get_style(active)
+        id = self.id(state)
         if id == self._selected_id: color = self.COLOR_SELECTED
 
         for shape in self.dot_widget.graph.subgraph_shapes.get('cluster ' + id, []):
