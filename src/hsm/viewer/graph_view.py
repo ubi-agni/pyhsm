@@ -20,8 +20,22 @@ def c2hex(color):
 
 class DotWidget(xdot.DotWidget):
     """Customized DotWidget overriding some virtual methods"""
+
+    __gsignals__ = {
+        'activated' : (GObject.SIGNAL_RUN_LAST, None, (str, object))
+    }
+
     def __init__(self, *args, **kwargs):
         xdot.DotWidget.__init__(self, *args, **kwargs)
+
+    def on_area_button_press(self, area, event):
+        if event.type == Gdk.EventType._2BUTTON_PRESS:
+            if event.button == 1:
+                url = self.get_url(event.x, event.y)
+                if url is not None:
+                    self.emit('activated', url.url, event)
+            return True  # mark event as processed
+        return xdot.DotWidget.on_area_button_press(self, area, event)
 
     def on_click(self, element, event):
         if event.button == 1:

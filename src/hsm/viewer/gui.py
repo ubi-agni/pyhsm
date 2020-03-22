@@ -116,6 +116,7 @@ class Gui(object):
     def _connect_signals(self, builder):
         builder.connect_signals(self)
         self.graph_view.dot_widget.connect('clicked', self.on_graph_selection_changed)
+        self.graph_view.dot_widget.connect('activated', self.on_graph_activated)
 
     def root_state_from_id(self, id):
         """Retrieve root state from given graph id"""
@@ -162,6 +163,10 @@ class Gui(object):
         item = self.item_from_id(url)
         item and self.tree_view.get_selection().select_path(self.tree_model.get_path(item))
 
+    def on_graph_activated(self, widget, url, event):
+        item = self.item_from_id(url)
+        item and self.on_trigger_transition(widget, item)
+
     def on_tree_selection_changed(self, selection):
         model, item = selection.get_selected()
         if item is not None:
@@ -173,6 +178,8 @@ class Gui(object):
         elif source is self.tree_view:
             path = args[0]
             item = source.get_model().get_iter(path)
+        elif source is self.graph_view.dot_widget:
+            item = args[0]
         else:
             raise TypeError('Unknown source: ' + str(source))
 
