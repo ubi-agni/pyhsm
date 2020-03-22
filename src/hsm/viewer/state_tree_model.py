@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import rospy
 import pyhsm_msgs.msg as msgs
 
@@ -283,8 +281,10 @@ class StateTreeModel(Gtk.TreeStore):
         old_current = root_state.current and \
                       self.find_node(root_state.current.path[strip:], parent=root)
         new_current = self.find_node((root_state.prefix + msg.path)[strip:], parent=root)
-        changed = new_current != old_current
-        root_state.current = None if new_current is None else self.state(new_current)
+        old_state = old_current and self.state(old_current)
+        new_state = new_current and self.state(new_current)
+        changed = new_state is not old_state
+        root_state.current = new_state
 
         if changed:
             if new_current is not None:
