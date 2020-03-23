@@ -47,12 +47,14 @@ class DotWidget(xdot.DotWidget):
     def error_dialog(self, error):
         pass
 
+
 class GraphView(object):
     COLOR_SELECTED = hex2c('#FB000DFF')
     COLOR_ACTIVE = hex2c('#5C7600FF')
-    COLOR_INACTIVE = hex2c('#808080FF')
+    COLOR_INACTIVE = hex2c('#404040FF')
 
     FILL_ACTIVE = hex2c('#C0F700FF')
+    FILL_ROOT = hex2c('#DDDDDDFF')
     FILL_INACTIVE = hex2c('#FFFFFFFF')
 
     def __init__(self, builder, model):
@@ -123,9 +125,8 @@ class GraphView(object):
 
             label = model.label(item)
             id = self.id(state)
-            active = model.get_value(item, model.WEIGHT) > Pango.Weight.NORMAL
-            color, fillcolor, linewidth = self.get_style(active)
-            attrs = dict(style='filled,setlinewidth({})'.format(linewidth), color=c2hex(color), fillcolor=c2hex(fillcolor))
+            color, fillcolor, linewidth = self.get_style(model, item, state)
+            attrs = dict(style='filled', penwidth=linewidth, color=c2hex(color), fillcolor=c2hex(fillcolor))
             if isinstance(state, RootStateNode):
                 parent = model.iter_parent(item)
                 parent = parent and model.state(parent)
@@ -198,10 +199,18 @@ class GraphView(object):
         self.dot_widget.queue_draw()
 
     @staticmethod
-    def get_style(active):
-        color = GraphView.COLOR_ACTIVE if active else GraphView.COLOR_INACTIVE
-        fillcolor = GraphView.FILL_ACTIVE if active else GraphView.FILL_INACTIVE
-        linewidth = 4 if active else 2
+    def get_style(model, item, state=None):
+        state = state and model.state(item)
+        parent = model.iter_parent(item)
+        parent = parent and model.state(parent)
+
+        is_active = model.get_value(item, model.WEIGHT) > Pango.Weight.NORMAL
+        is_root = isinstance(state, RootStateNode)
+        is_initial = parent and state.path.endswith('/' + parent.initial)
+
+        color = GraphView.COLOR_ACTIVE if is_active else GraphView.COLOR_INACTIVE
+        fillcolor = GraphView.FILL_ACTIVE if is_active else GraphView.FILL_ROOT if is_root else GraphView.FILL_INACTIVE
+        linewidth = 2 if is_active or is_initial else 1
         return color, fillcolor, linewidth
 
     def update_style(self, model, item):
@@ -209,8 +218,7 @@ class GraphView(object):
         if isinstance(state, DummyStateNode):
             return  # skip dummy nodes
 
-        active = model.get_value(item, model.WEIGHT) > Pango.Weight.NORMAL
-        color, fillcolor, linewidth = self.get_style(active)
+        color, fillcolor, linewidth = self.get_style(model, item, state)
         id = self.id(state)
         if id == self._selected_id: color = self.COLOR_SELECTED
 
