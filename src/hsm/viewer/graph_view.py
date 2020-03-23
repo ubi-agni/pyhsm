@@ -112,6 +112,7 @@ class GraphView(object):
         wrapper.width = self.label_width_spinner.get_value_as_int()
 
         def hierarchy(item, depth=0):
+            """Create hierarchical graph structure. The hierarchy is determined by edges from parent to children."""
             # recursively process children
             children = ''
             if max_depth == -1 or depth < max_depth:
@@ -138,7 +139,7 @@ class GraphView(object):
             return '''
 {indent}subgraph "cluster {id}" {{ {cluster_attrs}
 {indent}\t"__S {id}" [{node_attrs}]
-{children}
+{indent}\t"__S {id}" -> {{{children}}}
 {indent}}}'''.format(indent='\t' * (depth + 1), id=id, label=label, children=children,
                      cluster_attrs=format_attrs(**attrs),
                      node_attrs=format_attrs(label='\\n'.join(wrapper.wrap(label)), URL=id))
@@ -155,20 +156,15 @@ class GraphView(object):
             H = H or '\t"__empty__" [{attrs}]'.format(attrs=format_attrs(label='Path not available', fontcolor='red'))
 
         global_opts = format_attrs(join='\n\t',
-                                   compound='true',
-                                   outputmode='nodesfirst',
-                                   labeljust='l',
-                                   nodesep=0.5,
-                                   minlen=2,
-                                   mclimit=5,
-                                   clusterrank='local',
-                                   ranksep=0.75,
-                                   color='#000000FF',
-                                   fillcolor='#FFFFFF00',
-                                   ordering='')
+                                   clusterrank='local',  # consider cluster subgraphs (default)
+                                   compound='true',  # end arrows at cluster borders
+                                   # ranksep=0.75,  # minimum distance between different levels
+                                   outputmode='nodesfirst',  # draw edges on top of nodes
+                                   )
         return '''digraph {{
 \t{global_opts}
 \tnode [shape=plaintext]
+\tedge [style=invis]
 
 {hierarchy}
 }}'''.format(hierarchy=H, global_opts=global_opts)
