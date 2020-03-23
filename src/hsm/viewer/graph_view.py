@@ -107,6 +107,7 @@ class GraphView(object):
             self.update_styles(self.model)
 
     def dotcode(self, model):
+        """Create dot code for HSM. See https://www.graphviz.org/doc/info for dot documentation."""
         max_depth = self.depth_spinner.get_value_as_int()
         wrapper = self._label_wrapper
         wrapper.width = self.label_width_spinner.get_value_as_int()
@@ -157,13 +158,15 @@ class GraphView(object):
 
         global_opts = format_attrs(join='\n\t',
                                    clusterrank='local',  # consider cluster subgraphs (default)
-                                   compound='true',  # end arrows at cluster borders
-                                   # ranksep=0.75,  # minimum distance between different levels
-                                   outputmode='nodesfirst',  # draw edges on top of nodes
+                                   compound='true',  # end arrows at cluster borders (together with lhead + ltail)
+                                   outputorder='nodesfirst',  # draw edges on top of nodes
+                                   ranksep=0.1,  # minimum distance between different levels
+                                   nodesep=0,  # distanc between nodes at same rank
+                                   margin=5,  # distance between clusters (in points)
                                    )
         return '''digraph {{
 \t{global_opts}
-\tnode [shape=plaintext]
+\tnode [shape=plaintext, margin=0, height=0.1]
 \tedge [style=invis]
 
 {hierarchy}
