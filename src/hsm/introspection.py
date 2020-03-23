@@ -178,9 +178,9 @@ class IntrospectionServer(object):
             # Handle HISTORY transitions specially
             target = transition['to_state']
             if isinstance(target, hsm.core._History):
-                target = HISTORY_TRANSITION_MAGIC_WORD
+                target = IntrospectionServer._get_full_path(target.parent) + HISTORY_TRANSITION_MAGIC_WORD
             else:
-                target = target.name
+                target = IntrospectionServer._get_full_path(target)
 
             transition_msg = HsmTransition(
                 events=events,

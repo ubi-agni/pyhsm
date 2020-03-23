@@ -2,6 +2,7 @@ from . import *
 from . xdot import xdot
 from textwrap import TextWrapper
 from state_node import RootStateNode, DummyStateNode
+from hsm.introspection import HISTORY_TRANSITION_MAGIC_WORD
 
 
 def format_attrs(join='; ', **kwargs):
@@ -71,12 +72,14 @@ class GraphView(object):
         # So, need to connect manually here
         self.filter_combo = builder.get_object('filter_combo')
         self.zoom_to_fit_btn = builder.get_object('zoom_to_fit')
+        self.show_edges_btn = builder.get_object('show_edges')
         self.depth_spinner = builder.get_object('depth_spinner')
         self.label_width_spinner = builder.get_object('label_width_spinner')
         self.save_dlg = builder.get_object('save_dlg')
         builder.get_object('save_btn').connect('clicked', self.save)
 
         self.zoom_to_fit_btn.connect('toggled', self.zoom_to_fit)
+        self.show_edges_btn.connect('toggled', self.update)
         self.filter_combo.connect('changed', self.update)
         self.depth_spinner.connect('value-changed', self.update)
         self.label_width_spinner.connect('value-changed', self.update)
@@ -111,6 +114,7 @@ class GraphView(object):
         max_depth = self.depth_spinner.get_value_as_int()
         wrapper = self._label_wrapper
         wrapper.width = self.label_width_spinner.get_value_as_int()
+        show_edges = self.show_edges_btn.get_active()
 
         def hierarchy(item, depth=0):
             """Create hierarchical graph structure. The hierarchy is determined by edges from parent to children."""
@@ -139,22 +143,55 @@ class GraphView(object):
 
             return '''
 {indent}subgraph "cluster {id}" {{ {cluster_attrs}
-{indent}\t"__S {id}" [{node_attrs}]
-{indent}\t"__S {id}" -> {{{children}}}
+{indent}\t"{id}" [{node_attrs}]
+{indent}\t"{id}" -> {{{children}}}
 {indent}}}'''.format(indent='\t' * (depth + 1), id=id, label=label, children=children,
                      cluster_attrs=format_attrs(**attrs),
                      node_attrs=format_attrs(label='\\n'.join(wrapper.wrap(label)), URL=id))
 
-        # Generate state hierarchy H
+        def transitions(item, depth=0):
+            """Create edges for all transitions"""
+            # process current item
+            state = model.state(item)
+            root = state.root
+            prefix = root and root.server_name + ':' or ''
+
+            result = ''
+            if not isinstance(state, DummyStateNode):
+                source = self.id(state)
+                for idx, t in enumerate(state.transitions):
+                    edge_atts = dict(constraint='false', style="", URL='_E_{} {}'.format(idx, source))
+                    target = prefix + t.target
+                    if target.endswith(HISTORY_TRANSITION_MAGIC_WORD):
+                        target = target[:-len(HISTORY_TRANSITION_MAGIC_WORD)]  # truncate magic word
+                        edge_atts.update(color='blue')
+                    # Disabled to suppress warnings "head is inside tail cluster"
+                    # edge_atts.update(ltail="cluster " + source)
+                    edge_atts.update(lhead="cluster " + target)
+                    result += '\n\t"{src}" -> "{tgt}" [{edge_atts}]'. \
+                        format(src=source, tgt=target, edge_atts=format_attrs(**edge_atts))
+
+            # recursively process children
+            if max_depth == -1 or depth < max_depth:
+                for child in model.children(item):
+                    result += transitions(child, depth + 1)
+
+            return result
+
+        # Generate content
         if model.iter_children() is None:
-            H = '\t"__empty__" [{attrs}]'.format(attrs=format_attrs(label='Waiting for HSM', fontcolor='gray'))
+            content = '\t"__empty__" [{attrs}]'.format(attrs=format_attrs(label='Waiting for HSM', fontcolor='gray'))
         else:
             filter = self.filter_combo.get_active_iter()
             items = [filter] if filter else model.children(None)
-            H = ''
+
+            # state hierarchy
+            content = ''
             for item in items:
-                H += hierarchy(item)
-            H = H or '\t"__empty__" [{attrs}]'.format(attrs=format_attrs(label='Path not available', fontcolor='red'))
+                content += hierarchy(item)
+                if show_edges:
+                    content += transitions(item)
+            content = content or '\t"__empty__" [{attrs}]'.format(attrs=format_attrs(label='Path not available', fontcolor='red'))
 
         global_opts = format_attrs(join='\n\t',
                                    clusterrank='local',  # consider cluster subgraphs (default)
@@ -169,8 +206,8 @@ class GraphView(object):
 \tnode [shape=plaintext, margin=0, height=0.1]
 \tedge [style=invis]
 
-{hierarchy}
-}}'''.format(hierarchy=H, global_opts=global_opts)
+{content}
+}}'''.format(content=content, global_opts=global_opts)
 
     def update(self, *args):
         self.dot_widget.set_dotcode(self.dotcode(self.model))

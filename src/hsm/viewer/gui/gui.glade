@@ -27,6 +27,12 @@
     <property name="step_increment">5</property>
     <property name="page_increment">10</property>
   </object>
+  <object class="GtkImage" id="show_edges_icon">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="pixbuf">graph_view.png</property>
+    <property name="icon_size">3</property>
+  </object>
   <object class="GtkApplicationWindow" id="main">
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">HSM Viewer</property>
@@ -48,6 +54,7 @@
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="tooltip_text" translatable="yes">Switch between graph and tree view</property>
+                <property name="icon_widget">graph_view_icon</property>
                 <signal name="clicked" handler="toggle_view" swapped="no"/>
               </object>
               <packing>
@@ -128,22 +135,6 @@
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <child>
-              <object class="GtkTreeView" id="tree_view">
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <signal name="row-activated" handler="on_trigger_transition" swapped="no"/>
-                <child internal-child="selection">
-                  <object class="GtkTreeSelection">
-                    <signal name="changed" handler="on_tree_selection_changed" swapped="no"/>
-                  </object>
-                </child>
-              </object>
-              <packing>
-                <property name="name">tree</property>
-                <property name="title" translatable="yes">Tree View</property>
-              </packing>
-            </child>
-            <child>
               <object class="GtkBox">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
@@ -171,6 +162,18 @@
                         <property name="tooltip_text" translatable="yes">Autofit graph</property>
                         <property name="icon_name">zoom-fit-best</property>
                         <property name="active">True</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="homogeneous">True</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkToggleToolButton" id="show_edges">
+                        <property name="visible">True</property>
+                        <property name="can_focus">False</property>
+                        <property name="tooltip_text" translatable="yes">Autofit graph</property>
+                        <property name="icon_widget">show_edges_icon</property>
                       </object>
                       <packing>
                         <property name="expand">False</property>
@@ -324,6 +327,22 @@
               <packing>
                 <property name="name">graph</property>
                 <property name="title" translatable="yes">Graph View</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkTreeView" id="tree_view">
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <signal name="row-activated" handler="on_trigger_transition" swapped="no"/>
+                <child internal-child="selection">
+                  <object class="GtkTreeSelection">
+                    <signal name="changed" handler="on_tree_selection_changed" swapped="no"/>
+                  </object>
+                </child>
+              </object>
+              <packing>
+                <property name="name">tree</property>
+                <property name="title" translatable="yes">Tree View</property>
                 <property name="position">1</property>
               </packing>
             </child>
