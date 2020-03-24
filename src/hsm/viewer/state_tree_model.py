@@ -79,9 +79,7 @@ class StateTreeModel(Gtk.TreeStore):
                 label = self.label(item)
                 if path.startswith(label):  # potential match
                     tail = path[len(label):]
-                    if not tail:  # full match: done
-                        return item
-                    if tail[0] == '/':  # partial match
+                    if not tail or tail[0] == '/':  # partial match
                         # continue on deeper level
                         path = tail.lstrip('/')  # remove leading slashes
                         if not path:
@@ -202,7 +200,7 @@ class StateTreeModel(Gtk.TreeStore):
                 label = self.label(item)
                 if path.startswith(label):  # potential match
                     tail = path[len(label):]
-                    if tail[0] == '/':  # partial match
+                    if not tail or tail[0] == '/':  # partial match
                         tail = tail.lstrip('/')  # remove leading slashes
                         if not tail:  # nothing left -> full match: done
                             return item

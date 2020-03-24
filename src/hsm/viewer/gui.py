@@ -128,6 +128,8 @@ class Gui(object):
     def item_from_id(self, id):
         """Retrieve tree item from given graph id"""
         root_state = self.root_state_from_id(id)
+        if root_state is None:  # if the HSM already terminated, the root_state will be None
+            return None
         root = self.tree_model.root_from_root_state(root_state)
         strip = len(self.graph_view.id(root_state))
         return root and self.tree_model.find_node(id[strip:], parent=root)

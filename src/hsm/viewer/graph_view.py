@@ -242,7 +242,10 @@ class GraphView(object):
 
         is_active = model.get_value(item, model.WEIGHT) > Pango.Weight.NORMAL
         is_root = isinstance(state, RootStateNode)
-        is_initial = parent and state.path.endswith('/' + parent.initial)
+        try:
+            is_initial = state.path.endswith('/' + parent.initial)
+        except AttributeError:  # if parent is None or a dummy node, parent.initial will fail
+            is_initial = False
 
         color = GraphView.COLOR_ACTIVE if is_active else GraphView.COLOR_INACTIVE
         fillcolor = GraphView.FILL_ACTIVE if is_active else GraphView.FILL_ROOT if is_root else GraphView.FILL_INACTIVE
