@@ -32,7 +32,7 @@ class StateTreeModel(Gtk.TreeStore):
             parent_path = self.state(parent).path
             path = state.path
             assert(path.startswith(parent_path + '/'))
-            # label is determined by stripping of parent's path from state.path
+            # label is determined by stripping off parent's path from state.path
             label = path[len(parent_path)+1:]
         else:
             label = state.path
@@ -79,19 +79,16 @@ class StateTreeModel(Gtk.TreeStore):
                 label = self.label(item)
                 if path.startswith(label):  # potential match
                     tail = path[len(label):]
-                    if not tail or tail[0] == '/':  # partial match
-                        # continue on deeper level
-                        path = tail.lstrip('/')  # remove leading slashes
+                    if not tail or tail[0] == '/':  # full or partial match
+                        path = tail[1:]  # remove leading slash
                         if not path:
                             return item
-                        elif depth != 0:
+                        elif depth != 0:  # continue on deeper level
                             depth -= 1
                             item = self.iter_children(item)
                             continue
                 # spurious or no match, continue on current level
                 item = self.iter_next(item)
-
-        path = path.lstrip('/')  # remove leading slashes
 
         if first is None:  # start search from parent
             if not path: return parent  # special case: path already empty -> can return parent
@@ -101,7 +98,9 @@ class StateTreeModel(Gtk.TreeStore):
         else:  # continue search from first
             parent = self.iter_parent(first)
             parent_path = parent and self.path(parent) or ''
-            path = path[len(parent_path):]  # strip path from first
+            strip = len(parent_path)
+            if strip > 0: strip += 1  # for non-empty path, also strip slash
+            path = path[strip:]  # strip off parent's path + following slash
             first = self.iter_next(first)
 
         return _find(first, path, max_depth)
@@ -173,7 +172,7 @@ class StateTreeModel(Gtk.TreeStore):
         existing = self.find_node(tail, parent, max_depth=0)
 
         if existing is None:
-            rospy.logdebug('CONSTRUCTING: ' + path)
+            rospy.logdebug('CONSTRUCTING: {} in {}'.format(path[len(parent_path):], parent_path))
             return self.append(parent, StateNode(msg, self.root_state(root)))
         else:
             state = self.state(existing)  # turn tree item into associated state
@@ -200,8 +199,8 @@ class StateTreeModel(Gtk.TreeStore):
                 label = self.label(item)
                 if path.startswith(label):  # potential match
                     tail = path[len(label):]
-                    if not tail or tail[0] == '/':  # partial match
-                        tail = tail.lstrip('/')  # remove leading slashes
+                    if not tail or tail[0] == '/':  # full or partial match
+                        tail = tail[1:]  # remove leading slash
                         if not tail:  # nothing left -> full match: done
                             return item
                         # continue on deeper level
@@ -275,7 +274,7 @@ class StateTreeModel(Gtk.TreeStore):
                          format(root_state.path, root_state.server_name))
             return False
 
-        strip = len(root_state.path)
+        strip = len(root_state.path) + 1  # strip root path and following slash
         old_current = root_state.current and \
                       self.find_node(root_state.current.path[strip:], parent=root)
         new_current = self.find_node((root_state.prefix + msg.path)[strip:], parent=root)

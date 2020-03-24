@@ -131,7 +131,7 @@ class Gui(object):
         if root_state is None:  # if the HSM already terminated, the root_state will be None
             return None
         root = self.tree_model.root_from_root_state(root_state)
-        strip = len(self.graph_view.id(root_state))
+        strip = len(self.graph_view.id(root_state)) + 1  # strip off root state's id + slash
         return root and self.tree_model.find_node(id[strip:], parent=root)
 
     ### GUI event handlers

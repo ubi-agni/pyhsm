@@ -1,7 +1,7 @@
 from __future__ import print_function
 
 import pytest
-from hsm.core import StateMachine
+from hsm.core import StateMachine, Container
 from hsm.introspection import IntrospectionServer
 from pyhsm_msgs.msg import HsmStructure, HsmState
 from hsm.viewer.state_tree_model import StateTreeModel
@@ -64,16 +64,12 @@ def test_find():
         assert tree.label(item) == label
 
 
-def mockup_machine():
+def test_find_next():
     m = StateMachine('machine')
     m.add_states('A', 'B', 'C')
     l = ['machine', '  A', '  B', '  C']
-    return m, l
 
-
-def test_find_next():
     tree = StateTreeModel()
-    m, l = mockup_machine()
     msg = HsmStructure(states = IntrospectionServer._state_msgs(m))
 
     tree.update_tree(msg, 'server1')
@@ -84,4 +80,29 @@ def test_find_next():
     tree.update_tree(msg, 'server2')
     assert to_list(tree) == l * 2
     tree.update_tree(msg, 'server2')
-    assert to_list(tree) == l*2
+    assert to_list(tree) == l * 2
+
+
+def test_find_next_nested():
+    m = StateMachine('M')
+    # state A/B contains the separating slash!
+    m.add_states(Container('A/B'), Container('A'), Container('B'))  # 3 different states
+    m['A/B'].add_states('C')
+    m['A'].add_states('B')
+    m['B'].add_states('D')
+
+    msg = HsmStructure(states = IntrospectionServer._state_msgs(m))
+    tree = StateTreeModel()
+    tree.update_tree(msg, '/server')
+    print(to_list(tree))
+    assert to_list(tree) == ['M', '  A/B', '    C', '  A', '    B', '  B', '    D']
+
+    ab = tree.find_node('M/A/B')
+    b = tree.find_node('B', parent=tree.find_node('M/A'))
+    # states A/B and A / B are different
+    assert tree.state(ab) != tree.state(b)
+    assert tree.label(ab) == 'A/B'
+    assert tree.label(b) == 'B'
+    # but the share the same path
+    # TODO To (reliably) distinguish them by path, we need to send list of labels describing the path
+    assert tree.path(ab) == tree.path(b)
