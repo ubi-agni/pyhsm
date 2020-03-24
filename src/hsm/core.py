@@ -595,7 +595,7 @@ class StateMachine(Container):
                 if isinstance(child_state, Container):
                     states.append(child_state)
         self._enter_states(Event(None), None, self.state)
-
+        self.call_transition_cbs(None, self.leaf_state)
 
     def register_transition_cb(self, transition_cb, *args):
         """Adds a transition callback to this container."""
