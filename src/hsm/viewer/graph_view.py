@@ -153,8 +153,9 @@ class GraphView(object):
             """Create edges for all transitions"""
             # process current item
             state = model.state(item)
-            root = state.root
-            prefix = root and root.server_name + ':' or ''
+            # prefix for target states is id(state.root) w/o root's label
+            root = state.root and model.root_from_root_state(state.root)
+            prefix = root and self.id(state.root)[:-len(self.model.label(root))] or ''
 
             result = ''
             if not isinstance(state, DummyStateNode):
