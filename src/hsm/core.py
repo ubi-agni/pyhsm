@@ -18,7 +18,7 @@ from six import iteritems
 
 import collections
 from threading import Thread
-import Queue
+from Queue import Queue, Empty
 import signal
 import logging
 _LOGGER = logging.getLogger("hsm.core")
@@ -831,36 +831,44 @@ def run(sm, final_state):
     if isinstance(final_state, string_types):
         final_state = sm[final_state]
 
-    event_queue = Queue.Queue()
+    event_queue = Queue()
     def _dispatch_with_queue(event):
         event_queue.put(event)
 
-    sm._dispatch = sm.dispatch
+    _dispatch = sm.dispatch
     sm.dispatch = _dispatch_with_queue
 
     sm.initialize()
     def _finished():
         return sm.leaf_state is final_state or sm.leaf_state.is_substate(final_state)
 
-    def _signal_handler(signum, frame):
-        print(' Finishing on signal')
-        sm._transition_to(final_state, event=None)
-        sm.dispatch(object())  # finish event_queue
+    signal_chain = dict()
+    def _signal_handler(sig, frame):
+        print(' Finishing on signal ' + str(sig))
+        sm.dispatch(Event('__TRANSITION__', to_state=final_state))
+        # call previous handler as well
+        prev_handler = signal_chain.get(sig, None)
+        try:
+            prev_handler and prev_handler(sig, frame)
+        except KeyboardInterrupt:  # ignore exception thrown by default handler
+            pass
 
     # install signal handler
-    old_int_handler = signal.signal(signal.SIGINT, _signal_handler)
-    old_term_handler = signal.signal(signal.SIGTERM, _signal_handler)
+    for s in [signal.SIGINT, signal.SIGTERM]:
+        signal_chain[s] = signal.signal(s, _signal_handler)
 
     while not _finished():
         try:
-            event = event_queue.get()
-            sm._dispatch(event)
-        except Queue.Empty:
+            # TODO: replace with blocking call event_queue.get() in python3
+            # python2 ignores signals (Ctrl-C) when using blocking mode
+            event = event_queue.get(True, 100)
+            _dispatch(event)
+        except Empty:
             pass
 
     # restore signal handler
-    signal.signal(signal.SIGINT, old_int_handler)
-    signal.signal(signal.SIGTERM, old_term_handler)
+    for s in [signal.SIGINT, signal.SIGTERM]:
+        signal.signal(s, signal_chain[s])
+
     # restore dispatch()
-    sm.dispatch = sm._dispatch
-    del(sm._dispatch)
+    sm.dispatch = _dispatch
