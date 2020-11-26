@@ -225,6 +225,8 @@ class Gui(object):
             def remove_states(roots):
                 for root_state in roots:
                     root = self.tree_model.find_node(root_state.path)
+                    if root is None or self.tree_model.is_enabled(root):
+                        continue  # skip non-existing or re-enabled states
                     # remove root state and all its orphaned parents
                     while root:
                         parent = self.tree_model.iter_parent(root)

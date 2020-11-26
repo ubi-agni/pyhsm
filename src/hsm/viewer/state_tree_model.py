@@ -182,8 +182,10 @@ class StateTreeModel(Gtk.TreeStore):
     def _update_state(self, item, state, msg):
         """Update fields of state from msg."""
         assert state is self.state(item)
-        if state.update(msg):
-            self.row_changed(self.get_path(self.item), self.item)
+        was_disabled = not self.is_enabled(item)
+        self.enable(item, True)
+        if state.update(msg) or was_disabled:
+            self.row_changed(self.get_path(item), item)
 
     def _create_or_split_dummy(self, path):
         """Return a (dummy) node for the given path.
@@ -255,6 +257,9 @@ class StateTreeModel(Gtk.TreeStore):
         if recursive:
             for child in self.children(item):
                 self.enable(child, value, recursive)
+
+    def is_enabled(self, item):
+        return self.get_value(item, column=self.ENABLED)
 
     def root_from_root_state(self, root_state):
         root = self.find_node(root_state.path)
