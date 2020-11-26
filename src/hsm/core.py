@@ -19,6 +19,7 @@ from six import iteritems
 import collections
 from threading import Thread
 from Queue import Queue, Empty
+import sys
 import signal
 import logging
 _LOGGER = logging.getLogger("hsm.core")
@@ -846,22 +847,19 @@ def run(sm, final_state):
     def _signal_handler(sig, frame):
         print(' Finishing on signal ' + str(sig))
         sm.dispatch(Event('__TRANSITION__', to_state=final_state))
-        # call previous handler as well
-        prev_handler = signal_chain.get(sig, None)
-        try:
-            prev_handler and prev_handler(sig, frame)
-        except KeyboardInterrupt:  # ignore exception thrown by default handler
-            pass
 
     # install signal handler
     for s in [signal.SIGINT, signal.SIGTERM]:
         signal_chain[s] = signal.signal(s, _signal_handler)
 
+    if sys.version_info[0] > 2:
+        args = []  # blocking call for python 3
+    else:
+        args = [True, 100]  # non-blocking call for python 2, which ignores signals (Ctrl-C) otherwise
+
     while not _finished():
         try:
-            # TODO: replace with blocking call event_queue.get() in python3
-            # python2 ignores signals (Ctrl-C) when using blocking mode
-            event = event_queue.get(True, 100)
+            event = event_queue.get(*args)
             _dispatch(event)
         except Empty:
             pass
