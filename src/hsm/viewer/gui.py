@@ -117,6 +117,7 @@ class Gui(object):
         builder.connect_signals(self)
         self.graph_view.dot_widget.connect('clicked', self.on_graph_selection_changed)
         self.graph_view.dot_widget.connect('activated', self.on_graph_activated)
+        self.tree_model.connect('deleting-state', self._invalidate_comboboxes)
 
     def root_state_from_id(self, id):
         """Retrieve root state from given graph id"""
@@ -224,15 +225,12 @@ class Gui(object):
             # remove all root states from model after 10s
             def remove_states(roots):
                 for root_state in roots:
-                    root = self.tree_model.find_node(root_state.path)
-                    if root is None or self.tree_model.is_enabled(root):
-                        continue  # skip non-existing or re-enabled states
                     # remove root state and all its orphaned parents
+                    root = self.tree_model.find_node(root_state.path)
                     while root:
                         parent = self.tree_model.iter_parent(root)
-                        self._invalidate_comboboxes(self.tree_model.path(root))
-                        self.tree_model.remove(root)
-                        if self.tree_model.iter_children(parent): # no more children?
+                        if not self.tree_model.cleanup(root) or \
+                           self.tree_model.iter_children(parent): # still have children?
                             root = None # stop loop
                         else:
                             root = parent # traverse tree upwards
@@ -241,15 +239,12 @@ class Gui(object):
             GObject.timeout_add(10000, remove_states, server.roots)
             server.roots = set()  # clear set
 
-    def _invalidate_comboboxes(self, state_path):
-        """Invalidate any combobox showing state_path as its current item"""
+    def _invalidate_comboboxes(self, model, state_path):
+        """Invalidate the text entry of any combobox showing state_path (or a child)"""
         for combo in [self.path_combo, self.filter_combo]:
-            item = combo.get_active_iter()
             entry = combo.get_child()
-            text = (item and combo.get_model().path(item)) or (entry and entry.get_text())
-            if state_path == text or text.startswith(state_path + '/'):
-                combo.set_active_iter(None)
-                entry and entry.set_text('')
+            if entry and entry.get_text().startswith(state_path + '/'):
+                entry.set_text('')
 
     def _process_structure_msg(self, msg, server_name):
         """Build the tree as given by the ``HsmStructure`` message and subscribe to the server's status messages."""

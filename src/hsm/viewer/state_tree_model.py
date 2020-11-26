@@ -18,6 +18,8 @@ class StateTreeModel(Gtk.TreeStore):
     WEIGHT = 3    # font weight, indicating active state
     ENABLED = 4   # is item enabled for selection?
 
+    __gsignals__ = { 'deleting-state' : (GObject.SIGNAL_RUN_FIRST, None, (str,)) }
+
     def __init__(self):
         """Initialize an empty state tree model."""
         Gtk.TreeStore.__init__(self, StateNode, str, str, int, bool)
@@ -40,6 +42,22 @@ class StateTreeModel(Gtk.TreeStore):
         enabled = not isinstance(state, DummyStateNode)
 
         return Gtk.TreeStore.append(self, parent, [state, state.path, label, weight, enabled])
+
+    def cleanup(self, item):
+        """Cleanup orphaned states after a structure update. Return True if state was removed."""
+        if item is None:
+            return # nothing to do, state was already removed before
+        keep = self.is_enabled(item)  # keep state if it is (re)enabled
+        for sub in self.children(item):
+            if not self.cleanup(sub):  # or if any of its children was kept
+                keep = True
+        if not keep:
+            self.remove(item)
+        return not keep
+
+    def remove(self, item):
+        self.emit('deleting-state', self.path(item))
+        return Gtk.TreeStore.remove(self, item)
 
     def path(self, item):
         return self.get_value(item, column=self.PATH)
@@ -123,6 +141,7 @@ class StateTreeModel(Gtk.TreeStore):
         for state_msg in msg.states[1:]:
             parent = self._create_state(state_msg, parent, root)
 
+        self.cleanup(root)  # remove orphaned states
         return root
 
     def _create_root_state(self, parent, msg, prefix, server_name):
