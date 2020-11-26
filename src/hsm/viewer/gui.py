@@ -222,17 +222,25 @@ class Gui(object):
                 root and self.tree_model.enable(root, False, recursive=True)
 
             # remove all root states from model after 10s
-            def remove_states(states):
-                for state in states:
-                    self._invalidate_comboboxes(state.path)
-                    root = self.tree_model.find_node(state.path)
-                    self.tree_model.remove(root)
+            def remove_states(roots):
+                for root_state in roots:
+                    root = self.tree_model.find_node(root_state.path)
+                    # remove root state and all its orphaned parents
+                    while root:
+                        parent = self.tree_model.iter_parent(root)
+                        self._invalidate_comboboxes(self.tree_model.path(root))
+                        self.tree_model.remove(root)
+                        if self.tree_model.iter_children(parent): # no more children?
+                            root = None # stop loop
+                        else:
+                            root = parent # traverse tree upwards
                 self._update_list_model()
 
             GObject.timeout_add(10000, remove_states, server.roots)
             server.roots = set()  # clear set
 
     def _invalidate_comboboxes(self, state_path):
+        """Invalidate any combobox showing state_path as its current item"""
         for combo in [self.path_combo, self.filter_combo]:
             item = combo.get_active_iter()
             entry = combo.get_child()
@@ -247,7 +255,7 @@ class Gui(object):
         if rospy.is_shutdown():
             return
 
-        if not msg.states:
+        if not msg.states:  # empty states list signals that server has finished
             self._remove_server(server_name, msg.prefix)
             return
 
