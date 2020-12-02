@@ -569,12 +569,14 @@ class XDotAttrParser:
         self.pen = Pen()
         self.shapes = []
 
-    def __nonzero__(self):
+    def __bool__(self):
         return self.pos < len(self.buf)
 
+    __nonzero__ = __bool__  # for python2
+
     def unescape(self, buf):
-        buf = buf.replace('\\"', '"')
-        buf = buf.replace('\\n', '\n')
+        buf = buf.replace(b'\\"', b'"')
+        buf = buf.replace(b'\\n', b'\n')
         return buf
 
     def read_code(self):

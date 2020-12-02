@@ -2,7 +2,7 @@ import rospy
 import pyhsm_msgs.msg as msgs
 
 from . import *
-from state_node import DummyStateNode, RootStateNode, StateNode
+from .state_node import DummyStateNode, RootStateNode, StateNode
 
 
 class StateTreeModel(Gtk.TreeStore):

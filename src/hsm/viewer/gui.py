@@ -1,10 +1,11 @@
 import threading
 import rospy
 import os
+from six import itervalues
 
 from . import *
-from state_tree_model import StateTreeModel
-from graph_view import GraphView
+from .state_tree_model import StateTreeModel
+from .graph_view import GraphView
 from ..introspection import *
 from pyhsm_msgs.msg import HsmStructure, HsmCurrentState, HsmTransition
 from std_msgs.msg import String
@@ -95,7 +96,7 @@ class Gui(object):
 
         # configure combobox style to be list-like (instead of menu-like)
         css = Gtk.CssProvider()
-        css.load_from_data("* { -GtkComboBox-appears-as-list: True; }")
+        css.load_from_data(b"* { -GtkComboBox-appears-as-list: True; }")
         combo.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
         # configure (short) labels to be displayed in popup view
@@ -121,7 +122,7 @@ class Gui(object):
 
     def root_state_from_id(self, id):
         """Retrieve root state from given graph id"""
-        for sub in self._subs.itervalues():
+        for sub in itervalues(self._subs):
             for root in sub.roots:
                 if id.startswith(root.server_name + ':' + root.prefix):
                     return root

@@ -14,18 +14,17 @@ This module provides the core elements for hierarchical state machines: Event, S
 """
 # for Python 2 / 3 code compatibility
 from __future__ import print_function
-from six import iteritems
+from six import iteritems, string_types
+from six.moves.queue import Queue, Empty
 
 import collections
 from threading import Thread
-from Queue import Queue, Empty
 import sys
 import signal
 import logging
 _LOGGER = logging.getLogger("hsm.core")
 
 
-string_types = (str, unicode)
 any_event = object()
 
 

@@ -114,7 +114,7 @@
               <object class="GtkToolButton" id="trigger_transition_button">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="tooltip_text" translatable="yes">Tigger state transition</property>
+                <property name="tooltip_text" translatable="yes">Trigger state transition</property>
                 <property name="stock_id">gtk-media-play</property>
                 <signal name="clicked" handler="on_trigger_transition" swapped="no"/>
               </object>

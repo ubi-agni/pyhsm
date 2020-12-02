@@ -1,12 +1,13 @@
 from . import *
-from . xdot import xdot
+from .xdot import xdot
+from six import iteritems
 from textwrap import TextWrapper
-from state_node import RootStateNode, DummyStateNode
-from hsm.introspection import HISTORY_TRANSITION_MAGIC_WORD
+from .state_node import RootStateNode, DummyStateNode
+from ..introspection import HISTORY_TRANSITION_MAGIC_WORD
 
 
 def format_attrs(join='; ', **kwargs):
-    return join.join(['{key}="{value}"'.format(key=k, value=v) for k,v in kwargs.iteritems()])
+    return join.join(['{key}="{value}"'.format(key=k, value=v) for k,v in iteritems(kwargs)])
 
 
 def hex2c(hex):
@@ -34,7 +35,7 @@ class DotWidget(xdot.DotWidget):
             if event.button == 1:
                 url = self.get_url(event.x, event.y)
                 if url is not None:
-                    self.emit('activated', url.url, event)
+                    self.emit('activated', url.url.decode('utf-8'), event)
             return True  # mark event as processed
         return xdot.DotWidget.on_area_button_press(self, area, event)
 
@@ -42,7 +43,7 @@ class DotWidget(xdot.DotWidget):
         if event.button == 1:
             url = self.get_url(event.x, event.y)
             if url is not None:
-                self.emit('clicked', url.url, event)
+                self.emit('clicked', url.url.decode('utf-8'), event)
         return True  # mark event as processed
 
     def error_dialog(self, error):
@@ -262,7 +263,7 @@ class GraphView(object):
         id = self.id(state)
         if id == self._selected_id: color = self.COLOR_SELECTED
 
-        for shape in self.dot_widget.graph.subgraph_shapes.get('cluster ' + id, []):
+        for shape in self.dot_widget.graph.subgraph_shapes.get(b'cluster ' + id.encode('utf-8'), []):
             pen = shape.pen
             pen.color = color[:len(pen.color)]
             pen.fillcolor = fillcolor[:len(pen.fillcolor)]
