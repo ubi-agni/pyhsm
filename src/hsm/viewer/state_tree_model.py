@@ -81,7 +81,7 @@ class StateTreeModel(Gtk.TreeStore):
 
     def can_mount_at(self, item):
         """Can we mount a HSM root node at item?"""
-        if not isinstance(self.state(item), DummyStateNode) and self.get_value(item, self.ENABLED) == False:
+        if not isinstance(self.state(item), DummyStateNode) and self.is_enabled(item) == False:
             return True  # outdated (disabled) normal node
         return self.iter_children(item) is None  # leaf node
 
@@ -162,9 +162,9 @@ class StateTreeModel(Gtk.TreeStore):
                     else:  # otherwise fail
                         raise RuntimeError('server_name has changed: {} -> {}'.format(root_state.server_name, server_name))
                 else:
-                    if self.can_mount_at(root):
+                    if not self.can_mount_at(root):
                         raise RuntimeError('Failed to insert HSM root {} at state {}'.format(msg.path, root_state.path))
-                    # remove all children from root (in case of invalidated item)
+                    # remove all children from existing root
                     for item in self.children(root):
                         self.remove(item)
 
