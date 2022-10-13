@@ -25,7 +25,7 @@ class GraspProvider(ActionState):
         o.primitive_poses.append(geometry_msgs.msg.Pose())
 
         # call parent's method to actually trigger the request
-        super(GraspProvider, self)._on_enter(state, event)
+        super(GraspProvider, self)._on_enter(event)
 
     def feedback_cb(self, feedback):
         pass
@@ -55,7 +55,7 @@ class Compute(StateMachine):
         self.done_count += 1
         log.debug("{} grasps found".format(len(event.userdata['result'].grasps)))
 
-    def on_transition(self, to_state):
+    def on_transition(self, from_state, to_state):
         log.debug("entered state: {}".format(to_state.name))
 
 
