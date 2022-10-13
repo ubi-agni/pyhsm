@@ -24,18 +24,14 @@ class ActionState(hsm.Container):
     ACTIVE = 3
     EXITING = 4
 
-    def __init__(self, client=None, action_name=None, action_spec=None,
-                 goal = None, name=None, server_wait_timeout = 10.0):
+    def __init__(self, action, spec=None, goal=None, name=None, server_wait_timeout = 10.0):
         """Constructor for ActionState action client wrapper.
 
-        @type client: actionlib.SimpleActionClient
-        @param client: SimpleActionClient instance to use.
+        @type action: actionlib.SimpleActionClient | string
+        @param action: SimpleActionClient instance to use or name of ROS action to create a client for
 
-        @type action_name: string
-        @param action_name: The name of the action as it will be broadcast over ros.
-
-        @type action_spec: actionlib action msg
-        @param action_spec: The type of action to which this client will connect.
+        @type spec: actionlib action msg
+        @param spec: The type of action to which this client will connect.
 
         @type goal: actionlib goal msg
         @param goal: If the goal for this action does not need to be generated at
@@ -45,19 +41,16 @@ class ActionState(hsm.Container):
         @param server_wait_timeout: This is the timeout used for aborting while
         waiting for an action server to become active.
         """
-        if client is not None and (action_name is not None or action_spec is not None):
-            raise ValueError('Cannot handle both, client and action arguments')
-
-        if isinstance(client, actionlib.SimpleActionClient):
-            self._action_client = client
+        if isinstance(action, actionlib.SimpleActionClient):
+            self._action_client = action
         else:
-            self._action_client = actionlib.SimpleActionClient(action_name, action_spec)
+            self._action_client = actionlib.SimpleActionClient(action, spec)
         self._action_name = self._action_client.action_client.ns
 
         # Initialize base class
         super(ActionState, self).__init__(name if name is not None else self._action_name)
 
-        self.goal = goal if goal is not None else copy.copy(self._action_client.action_client.ActionGoal())
+        self.goal = goal if goal is not None else self._action_client.action_client.ActionGoal().goal
 
         self._status = ActionState.WAITING_FOR_SERVER
         self._server_wait_timeout = rospy.Duration(server_wait_timeout)
