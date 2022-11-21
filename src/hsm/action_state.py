@@ -38,6 +38,10 @@ class ActionState(hsm.Container):
         @type server_wait_timeout: C{rospy.Duration}
         @param server_wait_timeout: This is the timeout used for aborting while
         waiting for an action server to become active.
+
+        The reported status ('PENDING','ACTIVE','PREEMPTED','SUCCEEDED','ABORTED','REJECTED','LOST')
+        is dispatched as an HSM event. If the connection to the action server could not be established
+        within the given timeout, a 'TIMEOUT' event is dispatched.
         """
         if isinstance(action, actionlib.SimpleActionClient):
             self._action_client = action
@@ -76,7 +80,7 @@ class ActionState(hsm.Container):
                 if rospy.core._in_shutdown: # silently return if just a shutdown was triggered
                     return
                 raise
-        _LOGGER.warning("Action server '{0}' not found for {1:.1f} seconds."
+        _LOGGER.warning("Action server '{0}' not found within {1:.1f} seconds."
                         .format(self._action_name, (rospy.get_rostime() - timeout_time + self._server_wait_timeout).to_sec()))
         self._on_server_failed()
 
@@ -96,25 +100,21 @@ class ActionState(hsm.Container):
 
     def _on_enter(self, event):
         _LOGGER.debug("status: %d" % self._status)
-        # If we immediately re-entered the state after exiting, status might be still EXITING
-        if self._status == ActionState.EXITING:
-            if self._action_wait_thread.is_alive():
-                # If _action_wait_thread still active, simply continue it
-                self._status = ActionState.WAITING_FOR_SERVER
-            else:
-                self._status = ActionState.INACTIVE
-
-        if self._status == ActionState.WAITING_FOR_SERVER:
-            self._status = ActionState.PENDING
+        if self._action_client.wait_for_server(rospy.Duration(0.01)): # server connected?
+            assert self._status not in [ActionState.PENDING, ActionState.ACTIVE]
+            self._status = ActionState.INACTIVE
+        else:
+            self._status = ActionState.PENDING # we have a pending goal, but not yet connected
             if not self._action_wait_thread.is_alive():
                 self._action_wait_thread = threading.Thread(name=self._action_name + '/wait_for_server',
                                                             target=self._wait_for_server)
                 self._action_wait_thread.start()
+            return
 
-        elif self._status == ActionState.INACTIVE:
+        if self._status == ActionState.INACTIVE:
             self._send_goal()
         else:
-            raise Exception('unexpected internal state %d' % self._status)
+            assert False, 'unexpected internal state %d' % self._status
 
     def _on_exit(self, event):
         if self._status == ActionState.ACTIVE:
