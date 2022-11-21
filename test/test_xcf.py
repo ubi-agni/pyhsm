@@ -1,7 +1,6 @@
 from __future__ import print_function
 
 import vampire.vam as xcf
-import logging
 import hsm, hsm.xcf
 from RobotAPI import *
 
@@ -29,11 +28,6 @@ class MoveState(hsm.State):
 if __name__ == '__main__':
     mi_sim = xcf.createMemoryInterface("xcf:sim")
     mi_real = xcf.createMemoryInterface("xcf:ShortTerm")
-
-    # enable logging
-    logger = logging.getLogger("hsm")
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(logging.StreamHandler())
 
     # create a state machine with two (nearly) identical states triggering a move command
     m = hsm.StateMachine("xcf_test")

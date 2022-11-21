@@ -4,8 +4,6 @@ import hsm
 import rospy
 import threading
 import logging
-import copy
-import sys
 import actionlib
 
 __all__ = ['ActionState']

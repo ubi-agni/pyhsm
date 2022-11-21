@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-import threading, logging, time, rospy, sys
+import threading, rospy, sys
 import hsm
 from hsm import State, Container, StateMachine, Event
 from hsm.introspection import IntrospectionServer
@@ -101,11 +101,6 @@ if __name__ == '__main__':
     # use an anonymous node name if a prefix is used, but no node name remapping defined
     anonymous = len(prefix) and len(rospy.names.get_mappings().get('__name', 'empty'))
     rospy.init_node('oven', anonymous=bool(anonymous))
-
-    # enable logging
-    logger = logging.getLogger("hsm")
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(logging.StreamHandler())
 
     oven = Oven()
     sis = IntrospectionServer(rospy.get_name(), oven, prefix)

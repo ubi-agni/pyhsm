@@ -6,7 +6,6 @@ import grasping_msgs.msg, geometry_msgs.msg, shape_msgs.msg
 import rospy
 import unittest
 import rostest
-import logging
 
 
 class GraspProvider(ActionState):
@@ -116,12 +115,5 @@ class ActionStateTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # Not sure, why we need to manually setup logging
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter('[%(name)s] %(asctime)s: %(message)s'))
-    log = logging.getLogger("hsm.action_state")
-    log.addHandler(handler)
-    log.setLevel(logging.DEBUG)
-
     rospy.init_node("action_client")
     rostest.rosrun("", "", ActionStateTest)

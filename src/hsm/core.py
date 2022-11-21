@@ -22,8 +22,16 @@ from threading import Thread
 import sys
 import signal
 import logging
-_LOGGER = logging.getLogger("hsm.core")
 
+# Configure logging defaults
+# (rospy logger config disables all unconfigured loggers other than rosout)
+_LOGGER = logging.getLogger("hsm")
+_LOGGER.setLevel(logging.INFO)
+handler = logging.StreamHandler(stream=sys.stdout)
+handler.setFormatter(logging.Formatter(fmt='[%(levelname)s] %(message)s'))
+_LOGGER.addHandler(handler)
+
+_LOGGER = _LOGGER.getChild("core")
 
 any_event = object()
 
