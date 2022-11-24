@@ -1,0 +1,16 @@
+[tool.black]
+line-length = 105
+
+[tool.pylint.'MESSAGES CONTROL']
+init-hook = 'import sys; sys.path.append("src")'
+max-line-length = 105
+disable = [
+    "C0103", # (invalid-name)
+    "C0114", # (missing-module-docstring)
+    "C0115", # (missing-class-docstring)
+    "C0116", # (missing-function-docstring)
+]
+
+[tool.isort]
+profile = "black"
+line_length = 105

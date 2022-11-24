@@ -23,9 +23,9 @@ class TestHierarchicalDict(unittest.TestCase):
             d.a
 
     def test_assign_and_retrieve_with_parent(self):
-        parent = HierarchicalDict(a=[], b='b')
+        parent = HierarchicalDict(a=[], b="b")
         child = HierarchicalDict(parent, b=1)
-        self.assertEquals(parent.b, 'b')
+        self.assertEquals(parent.b, "b")
         self.assertEquals(child.b, 1)
         self.assertEquals(child.a, [])
 
@@ -38,5 +38,5 @@ class TestHierarchicalDict(unittest.TestCase):
         self.assertEquals(child.b, 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

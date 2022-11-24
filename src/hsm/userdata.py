@@ -8,7 +8,7 @@ class HierarchicalDict(object):
 
     def __init__(self, parent=None, **kwargs):
         """Initialize a new hierarchical dictionary with the given parent
-           and declare the keys given by remaining keyword arguments.
+        and declare the keys given by remaining keyword arguments.
         """
         self.__dict__.update(_dict=dict(), parent=parent)
         self.declare(**kwargs)
@@ -34,7 +34,7 @@ class HierarchicalDict(object):
     def __setattr__(self, key, value):
         """Assign the given value to an (existing) class attribute or an (existing) dictionary variable"""
         if key in self.__dict__:
-            self.__dict__[key]=value
+            self.__dict__[key] = value
         else:
             self.__setitem__(key, value)
 
@@ -49,7 +49,7 @@ class HierarchicalDict(object):
                 return self._dict[key]
             except KeyError:
                 self = self.parent
-        raise KeyError('%s was not declared' % key)
+        raise KeyError("%s was not declared" % key)
 
     def __setitem__(self, key, value):
         """Assign the given value to the dictionary variable given by key.
@@ -62,4 +62,4 @@ class HierarchicalDict(object):
                 return
             else:
                 self = self.parent
-        raise KeyError('%s was not declared' % key)
+        raise KeyError("%s was not declared" % key)

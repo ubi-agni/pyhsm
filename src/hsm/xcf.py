@@ -2,6 +2,7 @@ from hsm.core import State, Event, string_types
 import vampire.vam as xcf
 
 import logging
+
 _LOGGER = logging.getLogger("hsm.xcf")
 
 
@@ -12,6 +13,7 @@ class _XCFEvent(object):
         self.actions = actions
         self.handler = handler
         self.subscription = None
+
 
 def _subscribe_xcf_events(state, event):
     # subscribe events
@@ -30,13 +32,13 @@ def _unsubscribe_xcf_events(state, event):
 
 def _xcf_subscribe(state, memory, xpath, handler, actions=xcf.INSERT | xcf.REPLACE):
     # once, define _xcf_events and register enter/exit handlers to actually subscribe/unsubscribe events
-    if not hasattr(state, '_xcf_events'):
+    if not hasattr(state, "_xcf_events"):
         # define _xcf_events attribute
         state._xcf_events = []
         # on enter, subscribe to topics
-        state.add_handler('enter', lambda event: _subscribe_xcf_events(state, event))
+        state.add_handler("enter", lambda event: _subscribe_xcf_events(state, event))
         # on exit, unsubscribe
-        state.add_handler('exit', lambda event: _unsubscribe_xcf_events(state, event))
+        state.add_handler("exit", lambda event: _unsubscribe_xcf_events(state, event))
 
     # a string "handler" is interpreted as an event to be triggered
     if isinstance(handler, string_types):

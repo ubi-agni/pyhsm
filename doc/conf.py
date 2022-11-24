@@ -17,7 +17,7 @@ import sys
 import sphinx_rtd_theme
 
 # -- General configuration ------------------------------------------------
-sys.path.append(os.path.abspath('../src'))
+sys.path.append(os.path.abspath("../src"))
 
 # If your documentation needs a minimal Sphinx version, state it here.
 # needs_sphinx = '1.0'
@@ -36,7 +36,7 @@ extensions = [
 
 autosummary_generate = True
 autoclass_content = "both"  # Add __init__ doc (ie. params) to class summaries
-html_show_sourcelink = True  # Remove 'view source code' from top of page (for html, not python)
+html_show_sourcelink = True  # Don't show 'view source code' link for (generated) html
 autodoc_inherit_docstrings = True  # If no docstring, inherit from base class
 set_type_checking_flag = True  # Enable 'expensive' imports for sphinx_autodoc_typehints
 add_module_names = False
@@ -46,7 +46,7 @@ templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-source_suffix = ['.rst', '.md']
+source_suffix = [".rst", ".md"]
 
 # The encoding of source files.
 # source_encoding = 'utf-8-sig'
@@ -212,7 +212,7 @@ intersphinx_mapping = {"python": ("https://docs.python.org/3", None)}
 
 # Default options for generating documentation.
 autodoc_mock_imports = ["hsm.viewer", "hsm.xcf"]
-#autodoc_default_options = {}
+# autodoc_default_options = {}
 
 # Define common substitutions
 rst_prolog = """

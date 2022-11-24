@@ -22,7 +22,7 @@ import logging
 _LOGGER = logging.getLogger("hsm")
 _LOGGER.setLevel(logging.INFO)
 handler = logging.StreamHandler(stream=sys.stdout)
-handler.setFormatter(logging.Formatter(fmt='[%(levelname)s] %(message)s'))
+handler.setFormatter(logging.Formatter(fmt="[%(levelname)s] %(message)s"))
 _LOGGER.addHandler(handler)
 
 _LOGGER = _LOGGER.getChild("core")
@@ -55,10 +55,10 @@ class OrderedSet(collections.OrderedDict, collections.MutableSet):
         return self >= other and self != other
 
     def __repr__(self):
-        return 'OrderedSet([%s])' % (', '.join(map(repr, self.keys())))
+        return "OrderedSet([%s])" % (", ".join(map(repr, self.keys())))
 
     def __str__(self):
-        return '{%s}' % (', '.join(map(repr, self.keys())))
+        return "{%s}" % (", ".join(map(repr, self.keys())))
 
     difference = property(lambda self: self.__sub__)
     difference_update = property(lambda self: self.__isub__)
@@ -91,7 +91,7 @@ def _call(handler, *args, **kwargs):
 
 
 def bind(instance, function):
-    """ Turn a function to a bound method on an instance
+    """Turn a function to a bound method on an instance
 
     :param instance: some object
     :param function: unbound method, i.e. a function that takes `self` argument
@@ -102,6 +102,7 @@ def bind(instance, function):
 
 class StateMachineException(Exception):
     """All |StateMachine| exceptions are of this type."""
+
     pass
 
 
@@ -134,6 +135,7 @@ class Event(object):
         state_machine.dispatch(Event('start'))
         state_machine.dispatch(Event('start', key='value'))
     """
+
     def __init__(self, name, **userdata):
         self.name = name
         self.propagate = True
@@ -141,7 +143,7 @@ class Event(object):
         self._machine = None
 
     def __repr__(self):
-        return '<Event {0}, userdata={1}>'.format(self.name, self.userdata)
+        return "<Event {0}, userdata={1}>".format(self.name, self.userdata)
 
 
 class TransitionsContainer(collections.defaultdict):
@@ -154,7 +156,7 @@ class TransitionsContainer(collections.defaultdict):
     def get(self, state, event):
         for key in [event.name, any_event]:
             for transition in self[key]:
-                if transition['condition'](state, event) is True:
+                if transition["condition"](state, event) is True:
                     return transition
         return None
 
@@ -199,6 +201,7 @@ class State(object):
         running.add_handler('event', my_handler)
 
     """
+
     def __init__(self, name):
         self.name = name
         self.parent = None
@@ -207,11 +210,11 @@ class State(object):
 
         # register handlers for methods with name "on_*"
         for trigger, value in iteritems(self.__class__.__dict__):
-            if trigger.startswith('on_') and callable(value):
-                self.add_handler(trigger[3:], getattr(self,trigger))
+            if trigger.startswith("on_") and callable(value):
+                self.add_handler(trigger[3:], getattr(self, trigger))
 
     def add_handler(self, events, func, prepend=False):
-        """ Add a new event callback.
+        """Add a new event callback.
 
         :param trigger: name of triggering event
         :type trigger: str
@@ -296,17 +299,17 @@ class State(object):
         Validator(self).validate_add_transition(self, target_state, events)
 
         transition = {
-            'to_state': target_state,
-            'condition': condition,
-            'action': action,
-            'before': before,
-            'after': after,
+            "to_state": target_state,
+            "condition": condition,
+            "action": action,
+            "before": before,
+            "after": after,
         }
         for event in events:
             self._transitions.add(event, transition)
 
     def __repr__(self):
-        return '<State {0} ({1})>'.format(self.name, hex(id(self)))
+        return "<State {0} ({1})>".format(self.name, hex(id(self)))
 
     @property
     def root(self):
@@ -342,15 +345,19 @@ class State(object):
 
     def _on(self, event):
         # when calling enter/exit handlers pass the original event
-        is_enter_exit_event = event.name in ['exit', 'enter']
-        e = event.userdata['source_event'] if is_enter_exit_event else event
+        is_enter_exit_event = event.name in ["exit", "enter"]
+        e = event.userdata["source_event"] if is_enter_exit_event else event
 
         # HACK: State doesn't provide a leaf_state, while self.parent might be None
         current = self.leaf_state if self.parent is None else self.parent.leaf_state
         handler = self._handlers.get(event.name, None)
         transition = None if is_enter_exit_event else self._transitions.get(current, event)
         if handler is not None and transition is not None:
-            raise Exception("Both, event handler and transition defined for event '{}' in state '{}'".format(event.name, self.name))
+            raise Exception(
+                "Both, event handler and transition defined for event '{}' in state '{}'".format(
+                    event.name, self.name
+                )
+            )
 
         if handler:
             if e is not None:
@@ -358,18 +365,18 @@ class State(object):
             _call(handler, e)
         elif transition is not None:
             sm = self.root
-            to_state = transition['to_state']
+            to_state = transition["to_state"]
             if isinstance(to_state, _History):
                 to_state = to_state.parent.history_state
 
-            transition['before'](self, event)
+            transition["before"](self, event)
             top_state = sm._exit_states(event, self, to_state)
-            transition['action'](self, event)
+            transition["action"](self, event)
             sm._enter_states(event, top_state, to_state)
             sm.call_transition_cbs(current, to_state)
             # Why is self.parent.leaf_state passed here?
             # transition['after'](self.parent.leaf_state, event)
-            transition['after'](to_state, event)
+            transition["after"](to_state, event)
             e.propagate = False
 
         # Never propagate exit/enter events, even if propagate is set to True
@@ -412,10 +419,10 @@ class Container(State):
         state = self
         keys = [None, key]
         while state is not None and len(keys) > 1:
-            keys = keys[1].split('.', 1)
+            keys = keys[1].split(".", 1)
             state = find_by_name(keys[0])
         if state is None:
-            raise IndexError('Unknown state {}'.format(key))
+            raise IndexError("Unknown state {}".format(key))
         return state
 
     def add_state(self, state, initial=False):
@@ -495,7 +502,7 @@ class Container(State):
 
         """
         state = self
-        while hasattr(state, 'state') and state.state is not None:
+        while hasattr(state, "state") and state.state is not None:
             state = state.state
         return state
 
@@ -507,7 +514,7 @@ class Container(State):
         :rtype: |State|
         """
         result = self
-        while hasattr(result, '_prev_state') and result._prev_state is not None:
+        while hasattr(result, "_prev_state") and result._prev_state is not None:
             result = result._prev_state
         return result
 
@@ -625,8 +632,8 @@ class StateMachine(Container):
         """
         if isinstance(event, string_types):
             event = Event(event)
-        if event.name == '__TRANSITION__':
-            self._transition_to(event.userdata['to_state'], event=None)
+        if event.name == "__TRANSITION__":
+            self._transition_to(event.userdata["to_state"], event=None)
         else:
             event._machine = self
             self.leaf_state._on(event)
@@ -642,12 +649,13 @@ class StateMachine(Container):
         if to_state is None:
             return None
         state = self.leaf_state
-        while (state.parent and
-                not (from_state.is_substate(state) and
-                     to_state.is_substate(state)) or
-                (state == from_state == to_state)):
-            _LOGGER.debug('exiting %s', state.name)
-            exit_event = Event('exit', propagate=False, source_event=event)
+        while (
+            state.parent
+            and not (from_state.is_substate(state) and to_state.is_substate(state))
+            or (state == from_state == to_state)
+        ):
+            _LOGGER.debug("exiting %s", state.name)
+            exit_event = Event("exit", propagate=False, source_event=event)
             exit_event._machine = self
             state._on(exit_event)
             state.parent._prev_state = state
@@ -676,8 +684,8 @@ class StateMachine(Container):
             path.append(self)
 
         for state in reversed(path):
-            _LOGGER.debug('entering %s', state.name)
-            enter_event = Event('enter', propagate=False, source_event=event)
+            _LOGGER.debug("entering %s", state.name)
+            enter_event = Event("enter", propagate=False, source_event=event)
             enter_event._machine = self
             state._on(enter_event)
 
@@ -689,15 +697,14 @@ class StateMachine(Container):
 class Validator(object):
     def __init__(self, state_machine):
         self._machine = state_machine
-        self.template = 'Machine "{0}" error: {1}'.format(
-            self._machine.name, '{0}')
+        self.template = 'Machine "{0}" error: {1}'.format(self._machine.name, "{0}")
 
     def _raise(self, msg):
         raise StateMachineException(self.template.format(msg))
 
     def validate_add_state(self, state, initial):
         if not isinstance(state, State):
-            msg = 'Unable to add state of type {0}'.format(type(state))
+            msg = "Unable to add state of type {0}".format(type(state))
             self._raise(msg)
         self._validate_state_already_added(state)
         if initial is True:
@@ -710,9 +717,9 @@ class Validator(object):
         while machines:
             machine = machines.popleft()
             if state in machine.states and machine is not self._machine:
-                msg = ('Machine "{0}" error: State "{1}" is already added '
-                       'to machine "{2}"'.format(
-                           self._machine.name, state.name, machine.name))
+                msg = 'Machine "{0}" error: State "{1}" is already added ' 'to machine "{2}"'.format(
+                    self._machine.name, state.name, machine.name
+                )
                 self._raise(msg)
             for child_state in machine.states:
                 if isinstance(child_state, StateMachine):
@@ -721,9 +728,10 @@ class Validator(object):
     def validate_set_initial(self, state):
         for added_state in self._machine.states:
             if added_state.initial is True and added_state is not state:
-                msg = ('Unable to set initial state to "{0}". '
-                       'Initial state is already set to "{1}"'
-                       .format(state.name, added_state.name))
+                msg = (
+                    'Unable to set initial state to "{0}". '
+                    'Initial state is already set to "{1}"'.format(state.name, added_state.name)
+                )
                 self._raise(msg)
 
     def validate_add_transition(self, from_state, to_state, events):
@@ -751,8 +759,7 @@ class Validator(object):
 
     def _validate_events(self, events):
         if not isinstance(events, collections.Iterable):
-            msg = ('Unable to add transition, events is not iterable: {0}'
-                   .format(events))
+            msg = "Unable to add transition, events is not iterable: {0}".format(events)
             self._raise(msg)
 
     def validate_initial_state(self, machine):
@@ -787,8 +794,8 @@ class ProcessingState(State):
         super(ProcessingState, self).__init__(name)
         self._thread = None
         self.preempt_requested = False
-        self.add_handler('enter',self._on_enter)
-        self.add_handler('exit', self._on_exit)
+        self.add_handler("enter", self._on_enter)
+        self.add_handler("exit", self._on_exit)
 
     def execute(self, event):
         """Method executed while this state is active
@@ -814,22 +821,22 @@ class ProcessingState(State):
 class CallbackState(ProcessingState):
     def __init__(self, name, callback, *args, **kwargs):
         """State executing a given function while being active."""
-        super(CallbackState,self).__init__(name)
+        super(CallbackState, self).__init__(name)
         self._cb = callback
         self._args = args
         self._kwargs = kwargs
 
-    def execute(self, event = None):
+    def execute(self, event=None):
         return self._cb(event, *self._args, **self._kwargs)
 
 
 def run(sm, final_state):
-    """Run the statemachine until the final state is reached. Events are dispatched a synchronous way.
-    """
+    """Run the statemachine until the final state is reached. Events are dispatched a synchronous way."""
     if isinstance(final_state, string_types):
         final_state = sm[final_state]
 
     event_queue = Queue()
+
     def _dispatch_with_queue(event):
         event_queue.put(event)
 
@@ -837,13 +844,15 @@ def run(sm, final_state):
     sm.dispatch = _dispatch_with_queue
 
     sm.initialize()
+
     def _finished():
         return sm.leaf_state is final_state or sm.leaf_state.is_substate(final_state)
 
     signal_chain = dict()
+
     def _signal_handler(sig, frame):
-        print(' Finishing on signal ' + str(sig))
-        sm.dispatch(Event('__TRANSITION__', to_state=final_state))
+        print(" Finishing on signal " + str(sig))
+        sm.dispatch(Event("__TRANSITION__", to_state=final_state))
 
     # install signal handler
     for s in [signal.SIGINT, signal.SIGTERM]:

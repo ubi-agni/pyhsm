@@ -29,6 +29,7 @@ class GraspProvider(ActionState):
     def feedback_cb(self, feedback):
         pass
 
+
 class Compute(StateMachine):
     TIMEOUT = 1
 
@@ -50,9 +51,9 @@ class Compute(StateMachine):
         self.initialize()
 
     def show_result(self, event):
-        self.grasps = len(event.userdata['result'].grasps)
+        self.grasps = len(event.userdata["result"].grasps)
         self.done_count += 1
-        log.debug("{} grasps found".format(len(event.userdata['result'].grasps)))
+        log.debug("{} grasps found".format(len(event.userdata["result"].grasps)))
 
     def on_transition(self, from_state, to_state):
         log.debug("entered state: {}".format(to_state.name))
@@ -114,6 +115,6 @@ class ActionStateTest(unittest.TestCase):
             func()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     rospy.init_node("action_client")
     rostest.rosrun("", "", ActionStateTest)

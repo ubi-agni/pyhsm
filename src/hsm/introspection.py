@@ -5,17 +5,23 @@ import hsm
 from std_msgs.msg import String
 from pyhsm_msgs.msg import HsmStructure, HsmState, HsmCurrentState, HsmTransition
 
-__all__ = ['IntrospectionClient', 'IntrospectionServer',
-           'STATUS_TOPIC', 'STRUCTURE_TOPIC', 'TRANSITION_TOPIC', 'EVENT_TOPIC']
+__all__ = [
+    "IntrospectionClient",
+    "IntrospectionServer",
+    "STATUS_TOPIC",
+    "STRUCTURE_TOPIC",
+    "TRANSITION_TOPIC",
+    "EVENT_TOPIC",
+]
 
 # Topic names
-STATUS_TOPIC = '/current_state'
-STRUCTURE_TOPIC = '/structure'
-TRANSITION_TOPIC = '/transition'
-EVENT_TOPIC = '/event'
+STATUS_TOPIC = "/current_state"
+STRUCTURE_TOPIC = "/structure"
+TRANSITION_TOPIC = "/transition"
+EVENT_TOPIC = "/event"
 
 # Magic word for transitions to history state
-HISTORY_TRANSITION_MAGIC_WORD = '__HISTORY'
+HISTORY_TRANSITION_MAGIC_WORD = "__HISTORY"
 
 
 class IntrospectionClient(object):
@@ -23,13 +29,18 @@ class IntrospectionClient(object):
     def get_servers():
         """Get the base names that are broadcasting HSM structures."""
         topics = rostopic.find_by_type(HsmStructure._type)
-        return [t[:t.rfind(STRUCTURE_TOPIC)] for t in topics]
+        return [t[: t.rfind(STRUCTURE_TOPIC)] for t in topics]
 
     @staticmethod
     def subscribe(server_name, callback, queue_size=50, **kwargs):
         """Subscribe to a new structure messaging server."""
-        return rospy.Subscriber(server_name + STRUCTURE_TOPIC, HsmStructure,
-                                callback=callback, queue_size=queue_size, **kwargs)
+        return rospy.Subscriber(
+            server_name + STRUCTURE_TOPIC,
+            HsmStructure,
+            callback=callback,
+            queue_size=queue_size,
+            **kwargs
+        )
 
 
 class IntrospectionServer(object):
@@ -46,16 +57,12 @@ class IntrospectionServer(object):
 
         # Advertise structure publisher
         self._structure_pub = rospy.Publisher(
-            name=server_name + STRUCTURE_TOPIC,
-            data_class=HsmStructure,
-            queue_size=1,
-            latch=True)
+            name=server_name + STRUCTURE_TOPIC, data_class=HsmStructure, queue_size=1, latch=True
+        )
 
         self._status_pub = rospy.Publisher(
-            name=server_name + STATUS_TOPIC,
-            data_class=HsmCurrentState,
-            queue_size=1,
-            latch=True)
+            name=server_name + STATUS_TOPIC, data_class=HsmCurrentState, queue_size=1, latch=True
+        )
 
     def start(self):
         self.publish_structure()
@@ -65,11 +72,11 @@ class IntrospectionServer(object):
 
         # subscribe to transition and event triggers
         self._transition_sub = rospy.Subscriber(
-            self._server_name + TRANSITION_TOPIC,
-            String, self._transition_cmd_cb)
+            self._server_name + TRANSITION_TOPIC, String, self._transition_cmd_cb
+        )
         self._event_sub = rospy.Subscriber(
-            self._server_name + EVENT_TOPIC,
-            String, self._event_trigger_cb)
+            self._server_name + EVENT_TOPIC, String, self._event_trigger_cb
+        )
 
     def stop(self):
         try:
@@ -94,23 +101,23 @@ class IntrospectionServer(object):
 
         # As we walked up from a child, we need to reverse the path's parts.
         names.reverse()
-        return '/'.join(names)
+        return "/".join(names)
 
     def _transition_cmd_cb(self, msg):
         to_state = self._machine
         try:
-            path = msg.data.split('/')
+            path = msg.data.split("/")
             if to_state.name != path[0]:
-                raise IndexError('Invalid root state name')
+                raise IndexError("Invalid root state name")
             for k in path[1:]:
                 to_state = to_state[k]
         except IndexError:
-            rospy.logerr('Unknown state: {}'.format(msg.data))
+            rospy.logerr("Unknown state: {}".format(msg.data))
             return
 
         # dispatch an event to trigger the transition
         # (don't call _transition_to() directly!)
-        self._machine.dispatch(hsm.Event('__TRANSITION__', to_state=to_state))
+        self._machine.dispatch(hsm.Event("__TRANSITION__", to_state=to_state))
 
     def _event_trigger_cb(self, msg):
         self._machine.dispatch(msg.data)
@@ -124,7 +131,7 @@ class IntrospectionServer(object):
 
         while node_stack:
             node = node_stack.pop()  # fetch nodes from the end of the stack
-            if hasattr(node, 'states'):
+            if hasattr(node, "states"):
                 # Schedule children in reverse order, to have correct parent_hierarchy!
                 node_stack.extend(reversed(node.states))
 
@@ -134,7 +141,7 @@ class IntrospectionServer(object):
             # Finally, add the new node
             parent_hierarchy.append(node)
 
-            path = '/'.join(map(lambda s: s.name, parent_hierarchy))
+            path = "/".join(map(lambda s: s.name, parent_hierarchy))
 
             state_msg = IntrospectionServer._state_msg(node, path)
             state_msgs.append(state_msg)
@@ -150,7 +157,7 @@ class IntrospectionServer(object):
         try:
             initial_state = state.initial_state.name
         except AttributeError:
-            initial_state = ''
+            initial_state = ""
         transitions = IntrospectionServer._transition_msgs(state)
 
         return HsmState(full_path, initial_state, transitions)
@@ -164,7 +171,7 @@ class IntrospectionServer(object):
         # Set up transition -> events mapping
         for event, transitions in state._transitions.items():
             if event is hsm.core.any_event:
-                event = '*'
+                event = "*"
             for transition in transitions:
                 # Transitions are ``dict``s, those cannot be hashed
                 hashable_transition = frozenset(transition.items())
@@ -176,9 +183,11 @@ class IntrospectionServer(object):
         for transition, events in transition_to_events_dict.items():
             transition = dict(transition)
             # Handle HISTORY transitions specially
-            target = transition['to_state']
+            target = transition["to_state"]
             if isinstance(target, hsm.core._History):
-                target = IntrospectionServer._get_full_path(target.parent) + HISTORY_TRANSITION_MAGIC_WORD
+                target = (
+                    IntrospectionServer._get_full_path(target.parent) + HISTORY_TRANSITION_MAGIC_WORD
+                )
             else:
                 target = IntrospectionServer._get_full_path(target)
 
@@ -186,10 +195,10 @@ class IntrospectionServer(object):
                 events=events,
                 target=target,
                 # Convert these functions to strings
-                condition=transition['condition'].__name__,
-                action=transition['action'].__name__,
-                before=transition['before'].__name__,
-                after=transition['after'].__name__,
+                condition=transition["condition"].__name__,
+                action=transition["action"].__name__,
+                before=transition["before"].__name__,
+                after=transition["after"].__name__,
             )
             transition_msgs.append(transition_msg)
 

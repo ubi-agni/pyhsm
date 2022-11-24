@@ -5,12 +5,13 @@ from std_msgs.msg import String
 from .. import introspection
 from . import GObject
 
-__all__ = ['StateNode', 'RootStateNode', 'DummyStateNode']
+__all__ = ["StateNode", "RootStateNode", "DummyStateNode"]
 
 
 class StateNode(GObject.GObject):
     """A node representing a state in a HSM"""
-    __slots__ = [slot for slot in msgs.HsmState.__slots__ if slot != 'path']
+
+    __slots__ = [slot for slot in msgs.HsmState.__slots__ if slot != "path"]
 
     def __init__(self, msg, root):
         """Initialize a state node from the given ``HsmState`` message
@@ -51,11 +52,13 @@ class RootStateNode(StateNode):
         """Initialize a state node from the given ``HsmState`` message and other meta information."""
         self._prefix = prefix
         # Ensure _prefix has a trailing slash
-        if self._prefix and self._prefix[-1] != '/':
-            self._prefix += '/'
+        if self._prefix and self._prefix[-1] != "/":
+            self._prefix += "/"
         StateNode.__init__(self, msg, self)  # initialize after _prefix!
         self._server_name = server_name
-        self._transition_publisher = rospy.Publisher(server_name + introspection.TRANSITION_TOPIC, String, queue_size=1)
+        self._transition_publisher = rospy.Publisher(
+            server_name + introspection.TRANSITION_TOPIC, String, queue_size=1
+        )
         self.current = None
 
     # HSM-related methods
@@ -82,4 +85,3 @@ class DummyStateNode(StateNode):
         # Do NOT StateNode.__init__ to ensure that slots remain undefined
         self._path = path
         self.root = None
-

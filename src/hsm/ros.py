@@ -2,6 +2,7 @@ from hsm.core import State, Event, string_types
 import rospy
 
 import logging
+
 _LOGGER = logging.getLogger("hsm.ros")
 
 
@@ -11,6 +12,7 @@ class _ROSEvent(object):
         self.msg_type = msg_type
         self.handler = handler
         self.subscriber = None
+
 
 def _subscribe_ros_events(state, event):
     # subscribe events
@@ -29,13 +31,13 @@ def _unsubscribe_ros_events(state, event):
 
 def _ros_subscribe(state, topic, msg_type, handler):
     # once, define _ros_events and register enter/exit handlers to actually subscribe/unsubscribe events
-    if not hasattr(state, '_ros_events'):
+    if not hasattr(state, "_ros_events"):
         # define _ros_events attribute
         state._ros_events = []
         # on enter, subscribe to topics
-        state.add_handler('enter', lambda event: _subscribe_ros_events(state, event))
+        state.add_handler("enter", lambda event: _subscribe_ros_events(state, event))
         # on exit, unsubscribe
-        state.add_handler('exit', lambda event: _unsubscribe_ros_events(state, event))
+        state.add_handler("exit", lambda event: _unsubscribe_ros_events(state, event))
 
     # a string "handler" is interpreted as an event to be triggered
     if isinstance(handler, string_types):

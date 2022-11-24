@@ -64,5 +64,5 @@ class CallbackStateTest(unittest.TestCase):
         self.assertEquals(sm.done_count, 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
