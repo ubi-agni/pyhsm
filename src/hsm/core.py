@@ -1,17 +1,11 @@
 """
-
 hsm.core
 --------
 
-This module provides the core elements for hierarchical state machines: Event, State, StateMachine
-
---------
-.. |StateMachine| replace:: :class:`~.StateMachine`
-.. |State| replace:: :class:`~.State`
-.. |Hashable| replace:: :class:`~collections.Hashable`
-.. |Iterable| replace:: :class:`~collections.Iterable`
-.. |Callable| replace:: :class:`~collections.Callable`
+This module provides the core elements for hierarchical state machines:
+|Event|, |State|, |StateMachine|
 """
+
 # for Python 2 / 3 code compatibility
 from __future__ import print_function
 from six import iteritems, string_types
@@ -98,6 +92,7 @@ def _call(handler, *args, **kwargs):
 
 def bind(instance, function):
     """ Turn a function to a bound method on an instance
+
     :param instance: some object
     :param function: unbound method, i.e. a function that takes `self` argument
                      that you now want to be bound to this class as a method
@@ -177,17 +172,6 @@ class State(object):
 
     It is encouraged to extend this class to encapsulate a state behavior,
     similarly to the State Pattern.
-
-    **Attributes:**
-
-        .. attribute:: state
-            Current, local state (instance of |State|) in a state machine.
-
-        .. attribute:: leaf_state
-            See the :attr:`~.StateMachine.leaf_state` property.
-
-        **root**
-            See the :attr:`~.StateMachine.root` property.
 
     :param name: Human readable state name
     :type name: str
@@ -397,9 +381,15 @@ class State(object):
 
 
 class Container(State):
-    """Container interface.
+    """Containers allow for hierarchical nesting of states.
 
-    Containers allow for hierarchical nesting of states.
+    Containers can be used to just group a set of children states.
+    However, the most useful feature of containers is behavior inheritance:
+    Containers can define a common (default) event handling for all its children states.
+    Of course, children still can override this event handling. But if they don't do and
+    thus don't handle a specific event, that event is propagated to the parent state,
+    i.e. the container, and handled there. If the parent doesn't handle the event either,
+    its further propagated to the grand parent and so on.
     """
 
     def __init__(self, name):
@@ -617,9 +607,9 @@ class StateMachine(Container):
         """Calls the registered transition callbacks.
         Callback functions are called with two arguments in addition to any
         user-supplied arguments:
-         - userdata
-         - a list of active states
-         """
+        - userdata
+        - a list of active states
+        """
         for (cb, args) in self._transition_cbs:
             cb(from_state, to_state, *args)
 
