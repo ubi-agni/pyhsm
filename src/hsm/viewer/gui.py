@@ -259,7 +259,7 @@ class Gui(object):
                 entry.set_text("")
 
     def _process_structure_msg(self, msg, server_name):
-        """Build the tree as given by the ``HsmStructure`` message and subscribe to the server's status messages."""
+        """Callback for ``HsmStructure`` message: received new HSM"""
         rospy.logdebug("STRUCTURE MSG WITH PREFIX: " + msg.prefix)
         if rospy.is_shutdown():
             return
@@ -291,6 +291,9 @@ class Gui(object):
             callback=lambda msg: GObject.idle_add(self._process_status_msg, msg, root_state),
             queue_size=50,
         )
+
+        # raise main window
+        self.main.present()
 
     def _process_status_msg(self, msg, root_state):
         """Update the tree using the given ``HsmCurrentState`` message."""
