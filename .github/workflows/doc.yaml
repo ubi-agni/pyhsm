@@ -1,4 +1,4 @@
-name: Generate and Deploy Documentation to GitHub Pages
+name: Docs
 
 on:
   # Runs on pushes targeting the default branch
@@ -57,6 +57,7 @@ jobs:
 
   # Deployment job
   deploy:
+    if: github.ref == 'refs/heads/master'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
