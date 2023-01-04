@@ -156,8 +156,11 @@ class TransitionsContainer(collections.defaultdict):
     def add(self, event, transition):
         self[event].append(transition)
 
-    def get(self, state, event):
-        for key in [event.name, any_event]:
+    def get(self, state, event, include_any):
+        events = [event.name]
+        if include_any:
+            events.append(any_event)
+        for key in events:
             for transition in self[key]:
                 if transition["condition"](state, event) is True:
                     return transition
@@ -354,7 +357,11 @@ class State(object):
         # HACK: State doesn't provide a leaf_state, while self.parent might be None
         current = self.leaf_state if self.parent is None else self.parent.leaf_state
         handler = self._handlers.get(event.name, None)
-        transition = None if is_enter_exit_event else self._transitions.get(current, event)
+        if is_enter_exit_event:
+            transition = None
+        else:
+            transition = self._transitions.get(current, event, include_any=handler is None)
+
         if handler is not None and transition is not None:
             raise Exception(
                 "Both, event handler and transition defined for event '{}' in state '{}'".format(
