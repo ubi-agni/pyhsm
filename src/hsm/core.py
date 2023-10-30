@@ -369,7 +369,7 @@ class State(object):
                 )
             )
 
-        if handler:
+        if handler is not None:
             if e is not None:
                 e.propagate = False
             _call(handler, e)
