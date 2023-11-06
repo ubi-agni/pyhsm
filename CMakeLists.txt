@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1.3)
+cmake_minimum_required(VERSION 3.10.2)
 project(pyhsm)
 
 find_package(catkin REQUIRED)
@@ -9,7 +9,7 @@ catkin_python_setup()
 catkin_package()
 
 # Install targets
-install(PROGRAMS scripts/viewer.py
+catkin_install_python(PROGRAMS scripts/viewer.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 #############

@@ -17,8 +17,9 @@ import sys
 import signal
 import logging
 
-if sys.version_info.major == 3 and sys.version_info.minor >= 10:
+if sys.version_info.major >= 3:
     collections.MutableSet = collections.abc.MutableSet
+    collections.Iterable = collections.abc.Iterable
 
 # Configure logging defaults
 # (rospy logger config disables all unconfigured loggers other than rosout)
