@@ -15,7 +15,7 @@
 repos:
   # Standard hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v4.6.0
     hooks:
       - id: check-added-large-files
       - id: check-case-conflict
@@ -31,13 +31,13 @@ repos:
 
   # format code
   - repo: https://github.com/psf/black
-    rev: 22.6.0
+    rev: 24.8.0
     hooks:
       - id: black
 
   # remove unused imports
   - repo: https://github.com/hadialqattan/pycln
-    rev: "v2.1.2"
+    rev: "v2.4.0"
     hooks:
       - id: pycln
         stages: [manual]
@@ -46,7 +46,7 @@ repos:
   # Use tools/codespell_ignore_lines_from_errors.py
   # to rebuild .codespell-ignore-lines
   - repo: https://github.com/codespell-project/codespell
-    rev: "v2.2.2"
+    rev: "v2.3.0"
     hooks:
       - id: codespell
         exclude: xdot.py

@@ -266,9 +266,7 @@ class GraphView(object):
         fillcolor = (
             GraphView.FILL_ACTIVE
             if is_active
-            else GraphView.FILL_ROOT
-            if is_root
-            else GraphView.FILL_INACTIVE
+            else GraphView.FILL_ROOT if is_root else GraphView.FILL_INACTIVE
         )
         linewidth = 2 if is_active or is_initial else 1
         return color, fillcolor, linewidth

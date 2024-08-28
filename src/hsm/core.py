@@ -628,7 +628,7 @@ class StateMachine(Container):
         - userdata
         - a list of active states
         """
-        for (cb, args) in self._transition_cbs:
+        for cb, args in self._transition_cbs:
             cb(from_state, to_state, *args)
 
     def dispatch(self, event):
